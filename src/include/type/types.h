@@ -218,6 +218,7 @@ enum class ExpressionType {
   // Internals added for Case When
   // -----------------------------
   OPERATOR_CASE_EXPR = 302,
+  OPERATOR_CASE_WHEN = 303,
 
   // -----------------------------
   // Internals added for NULLIF

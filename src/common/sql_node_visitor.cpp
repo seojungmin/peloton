@@ -20,12 +20,16 @@
 #include "expression/star_expression.h"
 #include "expression/tuple_value_expression.h"
 #include "expression/constant_value_expression.h"
+#include "expression/case_expression.h"
 
 namespace peloton {
 void SqlNodeVisitor::Visit(expression::ComparisonExpression *expr) {
   expr->AcceptChildren(this);
 }
 void SqlNodeVisitor::Visit(expression::AggregateExpression *expr) {
+  expr->AcceptChildren(this);
+}
+void SqlNodeVisitor::Visit(expression::CaseExpression *expr) {
   expr->AcceptChildren(this);
 }
 void SqlNodeVisitor::Visit(expression::ConjunctionExpression *expr) {
@@ -41,6 +45,9 @@ void SqlNodeVisitor::Visit(expression::OperatorExpression *expr) {
   expr->AcceptChildren(this);
 }
 void SqlNodeVisitor::Visit(expression::OperatorUnaryMinusExpression *expr) {
+  expr->AcceptChildren(this);
+}
+void SqlNodeVisitor::Visit(expression::OperatorCaseWhenExpression *expr) {
   expr->AcceptChildren(this);
 }
 void SqlNodeVisitor::Visit(expression::ParameterValueExpression *expr) {

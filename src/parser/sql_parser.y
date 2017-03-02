@@ -16,6 +16,7 @@
 #include "type/value_factory.h"
 #include "expression/abstract_expression.h"
 #include "expression/aggregate_expression.h"
+#include "expression/case_expression.h"
 #include "expression/operator_expression.h"
 #include "expression/comparison_expression.h"
 #include "expression/conjunction_expression.h"
@@ -205,7 +206,7 @@ struct PARSER_CUST_LTYPE {
 %token LOAD NULL PART PLAN SHOW TEXT TIME VIEW WITH ADD ALL
 %token AND ASC CSV FOR INT KEY NOT OFF SET TOP SUM MIN MAX AVG AS BY IF
 %token IN IS OF ON OR TO
-%token COPY DELIMITER
+%token COPY DELIMITER CASE WHEN THEN ELSE END
 
 /*********************************
  ** Non-Terminal types (http://www.gnu.org/software/bison/manual/html_node/Type-Decl.html)
@@ -229,7 +230,7 @@ struct PARSER_CUST_LTYPE {
 %type <table>		join_clause join_table table_ref_name_no_alias
 %type <expr> 		expr scalar_expr unary_expr binary_expr function_expr star_expr expr_alias parameter_expr opt_default
 %type <expr> 		column_name literal int_literal num_literal string_literal aggregate_expr
-%type <expr> 		comp_expr opt_where join_condition opt_having placeholder_expr
+%type <expr> 		comp_expr opt_where join_condition opt_having placeholder_expr case_expr when_expr else_expr
 %type <table_info>	table_name
 %type <order>		opt_order
 %type <limit>		opt_limit
@@ -239,7 +240,7 @@ struct PARSER_CUST_LTYPE {
 %type <group_t>		opt_group
 
 %type <str_vec>				ident_commalist opt_column_list
-%type <expr_vec>			expr_list select_list literal_list
+%type <expr_vec>			expr_list select_list literal_list when_expr_list
 %type <table_vec>			table_ref_commalist
 %type <update_vec>			update_clause_commalist
 %type <column_vec>			column_def_commalist 
@@ -735,6 +736,7 @@ expr:
 	|	binary_expr
 	|	aggregate_expr
 	|	function_expr
+	|	case_expr
 	;
 
 scalar_expr:
@@ -784,11 +786,28 @@ aggregate_expr:
 	|	MAX '(' opt_distinct expr ')' { $$ = new peloton::expression::AggregateExpression(peloton::ExpressionType::AGGREGATE_MAX, $3, $4); }
 	|	AVG '(' opt_distinct expr ')' { $$ = new peloton::expression::AggregateExpression(peloton::ExpressionType::AGGREGATE_AVG, $3, $4); }
 	|	COUNT '(' opt_distinct expr ')' { $$ = new peloton::expression::AggregateExpression(peloton::ExpressionType::AGGREGATE_COUNT, $3, $4); }
-
 	;
-	
 
-column_name:
+case_expr:
+		CASE expr when_expr_list else_expr END { $$ = new peloton::expression::CaseExpression((*$3)[0]->GetValueType(), $2, $3, $4); }
+	| 	CASE when_expr_list else_expr END { $$ = new peloton::expression::CaseExpression((*$2)[0]->GetValueType(), nullptr, $2, $3); } 
+	;
+
+when_expr_list:
+		when_expr { $$ = new std::vector<peloton::expression::AbstractExpression*>(); $$->push_back($1); }
+	| 	when_expr_list when_expr { $1->push_back($2); $$ = $1; }
+	;
+
+when_expr:
+		WHEN expr THEN expr { $$ = new peloton::expression::OperatorCaseWhenExpression($4->GetValueType(), $2, $4); }
+	;
+
+else_expr:
+		ELSE expr { $$ = $2; }
+	| 	/* empty */ { $$ = NULL; }
+	;
+
+column_name: 
 		IDENTIFIER { $$ = new peloton::expression::TupleValueExpression(std::move(CharsToStringDestructive($1))); }
 	|	IDENTIFIER '.' IDENTIFIER { $$ = new peloton::expression::TupleValueExpression(std::move(CharsToStringDestructive($3)), std::move(CharsToStringDestructive($1))); }
 	;

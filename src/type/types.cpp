@@ -534,6 +534,9 @@ std::string ExpressionTypeToString(ExpressionType type) {
     case ExpressionType::OPERATOR_CASE_EXPR: {
       return ("OPERATOR_CASE_EXPR");
     }
+    case ExpressionType::OPERATOR_CASE_WHEN: {
+      return ("OPERATOR_CASE_WHEN");
+    }
     case ExpressionType::OPERATOR_NULLIF: {
       return ("OPERATOR_NULLIF");
     }
@@ -722,6 +725,8 @@ ExpressionType StringToExpressionType(const std::string& str) {
     return ExpressionType::HASH_RANGE;
   } else if (upper_str == "OPERATOR_CASE_EXPR") {
     return ExpressionType::OPERATOR_CASE_EXPR;
+  } else if (upper_str == "OPERATOR_CASE_WHEN") {
+    return ExpressionType::OPERATOR_CASE_WHEN;
   } else if (upper_str == "OPERATOR_NULLIF") {
     return ExpressionType::OPERATOR_NULLIF;
   } else if (upper_str == "OPERATOR_COALESCE") {
