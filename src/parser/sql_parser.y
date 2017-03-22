@@ -178,6 +178,13 @@ struct PARSER_CUST_LTYPE {
 	std::vector<peloton::parser::UpdateClause*>* update_vec;
 	std::vector<peloton::expression::AbstractExpression*>* expr_vec;
 	std::vector<std::vector<peloton::expression::AbstractExpression*>*>* insert_tuple_vec;
+
+	peloton::expression::CaseExpression* case_expr_t;
+    std::pair<std::unique_ptr<peloton::expression::AbstractExpression>,
+        std::unique_ptr<peloton::expression::AbstractExpression>>* when_t;
+    std::vector<std::pair<std::unique_ptr<
+        peloton::expression::AbstractExpression>,
+        std::unique_ptr<peloton::expression::AbstractExpression>>>* when_vec;
 }
 
 
@@ -230,7 +237,7 @@ struct PARSER_CUST_LTYPE {
 %type <table>		join_clause join_table table_ref_name_no_alias
 %type <expr> 		expr scalar_expr unary_expr binary_expr function_expr star_expr expr_alias parameter_expr opt_default
 %type <expr> 		column_name literal int_literal num_literal string_literal aggregate_expr
-%type <expr> 		comp_expr opt_where join_condition opt_having placeholder_expr case_expr when_expr else_expr
+%type <expr> 		comp_expr opt_where join_condition opt_having placeholder_expr else_expr case_expr
 %type <table_info>	table_name
 %type <order>		opt_order
 %type <limit>		opt_limit
@@ -240,11 +247,14 @@ struct PARSER_CUST_LTYPE {
 %type <group_t>		opt_group
 
 %type <str_vec>				ident_commalist opt_column_list
-%type <expr_vec>			expr_list select_list literal_list when_expr_list
+%type <expr_vec>			expr_list select_list literal_list
 %type <table_vec>			table_ref_commalist
 %type <update_vec>			update_clause_commalist
 %type <column_vec>			column_def_commalist 
 %type <insert_tuple_vec>	insert_list
+
+%type <when_t> when_expr
+%type <when_vec> when_expr_list
 
 /******************************
  ** Token Precedence and Associativity
@@ -789,22 +799,24 @@ aggregate_expr:
 	;
 
 case_expr:
-		CASE expr when_expr_list else_expr END { $$ = new peloton::expression::CaseExpression((*$3)[0]->GetValueType(), $2, $3, $4); }
-	| 	CASE when_expr_list else_expr END { $$ = new peloton::expression::CaseExpression((*$2)[0]->GetValueType(), nullptr, $2, $3); } 
+		CASE expr when_expr_list else_expr END {
+			$$ = new peloton::expression::CaseExpression(((*$3)[0]).second->GetValueType(), (peloton::expression::CaseExpression::AbsExprPtr)$2, *$3, (peloton::expression::CaseExpression::AbsExprPtr)$4); }
+	| 	CASE when_expr_list else_expr END {
+			$$ = new peloton::expression::CaseExpression(((*$2)[0]).second->GetValueType(), nullptr, *$2, (peloton::expression::CaseExpression::AbsExprPtr)$3); } 
 	;
 
 when_expr_list:
-		when_expr { $$ = new std::vector<peloton::expression::AbstractExpression*>(); $$->push_back($1); }
-	| 	when_expr_list when_expr { $1->push_back($2); $$ = $1; }
+		when_expr { $$ = new std::vector<peloton::expression::CaseExpression::WhenClause>; $$->push_back(std::move(*$1)); }
+	| 	when_expr_list when_expr { $1->push_back(std::move(*$2)); $$ = $1; }
 	;
 
 when_expr:
-		WHEN expr THEN expr { $$ = new peloton::expression::OperatorCaseWhenExpression($4->GetValueType(), $2, $4); }
+		WHEN expr THEN expr { $$ = new peloton::expression::CaseExpression::WhenClause((peloton::expression::CaseExpression::AbsExprPtr)$2, (peloton::expression::CaseExpression::AbsExprPtr)$4); }
 	;
 
 else_expr:
 		ELSE expr { $$ = $2; }
-	| 	/* empty */ { $$ = NULL; }
+	| 	/* empty */ { $$ = nullptr; }
 	;
 
 column_name: 

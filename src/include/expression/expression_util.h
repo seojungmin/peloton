@@ -501,6 +501,7 @@ class ExpressionUtil {
                           needs_projection, find_columns);
       }
     }
+
     // make sure the return types for expressions are set correctly
     // this is useful in operator expressions
     expr->DeduceExpressionType();

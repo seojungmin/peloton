@@ -47,9 +47,6 @@ void SqlNodeVisitor::Visit(expression::OperatorExpression *expr) {
 void SqlNodeVisitor::Visit(expression::OperatorUnaryMinusExpression *expr) {
   expr->AcceptChildren(this);
 }
-void SqlNodeVisitor::Visit(expression::OperatorCaseWhenExpression *expr) {
-  expr->AcceptChildren(this);
-}
 void SqlNodeVisitor::Visit(expression::ParameterValueExpression *expr) {
   expr->AcceptChildren(this);
 }

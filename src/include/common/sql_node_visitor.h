@@ -45,7 +45,6 @@ class StarExpression;
 class TupleValueExpression;
 class FunctionExpression;
 class OperatorUnaryMinusExpression;
-class OperatorCaseWhenExpression;
 class CaseExpression;
 }
 
@@ -84,7 +83,6 @@ class SqlNodeVisitor {
   virtual void Visit(expression::FunctionExpression *expr);
   virtual void Visit(expression::OperatorExpression *expr);
   virtual void Visit(expression::OperatorUnaryMinusExpression *expr);
-  virtual void Visit(expression::OperatorCaseWhenExpression *expr);
   virtual void Visit(expression::ParameterValueExpression *expr);
   virtual void Visit(expression::StarExpression *expr);
   virtual void Visit(expression::TupleValueExpression *expr);

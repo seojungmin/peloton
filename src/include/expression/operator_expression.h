@@ -112,41 +112,5 @@ class OperatorUnaryMinusExpression : public AbstractExpression {
       : AbstractExpression(other) {}
 };
 
-class OperatorCaseWhenExpression : public AbstractExpression {
- public:
-  OperatorCaseWhenExpression(type::Type::TypeId type_id,
-                             AbstractExpression *left,
-                             AbstractExpression *right)
-      : AbstractExpression(ExpressionType::OPERATOR_CASE_WHEN, type_id, left,
-                           right) {}
-
-  type::Value Evaluate(const AbstractTuple *tuple1, const AbstractTuple *tuple2,
-                 executor::ExecutorContext *context) const override {
-    PL_ASSERT(children_.size() == 2);
-    auto vl = children_[0]->Evaluate(tuple1, tuple2, context);
-
-    if (vl.IsTrue()) {
-      return children_[1]->Evaluate(tuple1,
-                                    tuple2, context).CastAs(return_value_type_);
-    } else {
-      // the condition value is not true
-      // this statement shouldn't be executed
-      throw 0;
-    }
-  }
-
-  AbstractExpression *Copy() const override {
-    return new OperatorCaseWhenExpression(return_value_type_,
-                                          children_[0]->Copy(),
-                                          children_[1]->Copy());
-  }
-
-  virtual void Accept(SqlNodeVisitor *v) { v->Visit(this); }
-
- protected:
-  OperatorCaseWhenExpression(const OperatorCaseWhenExpression &other)
-      : AbstractExpression(other) {}
-};
-
 }  // End expression namespace
 }  // End peloton namespace
