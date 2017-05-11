@@ -155,13 +155,12 @@ Value Value::Min(CodeGen &codegen, const Value &o) const {
   // Check if this < o
   auto is_lt = CompareLt(codegen, o);
 
-  // Choose either this or o depending on result of comparison
+  // Choose either this or o, depending on result of comparison
   llvm::Value *val =
       codegen->CreateSelect(is_lt.GetValue(), GetValue(), o.GetValue());
-  llvm::Value *len = nullptr;
-  if (Type::HasVariableLength(GetType())) {
-    len = codegen->CreateSelect(is_lt.GetValue(), GetLength(), o.GetLength());
-  }
+  llvm::Value *len = Type::HasVariableLength(GetType()) ?
+      codegen->CreateSelect(is_lt.GetValue(), GetLength(), o.GetLength()) :
+      nullptr;
   return Value{GetType(), val, len};
 }
 
@@ -170,13 +169,12 @@ Value Value::Max(CodeGen &codegen, const Value &o) const {
   // Check if this > o
   auto is_gt = CompareGt(codegen, o);
 
-  // Choose either this or o depending on result of comparison
+  // Choose either this or o, depending on result of comparison
   llvm::Value *val =
       codegen->CreateSelect(is_gt.GetValue(), GetValue(), o.GetValue());
-  llvm::Value *len = nullptr;
-  if (Type::HasVariableLength(GetType())) {
-    len = codegen->CreateSelect(is_gt.GetValue(), GetLength(), o.GetLength());
-  }
+  llvm::Value *len = Type::HasVariableLength(GetType()) ?
+      codegen->CreateSelect(is_gt.GetValue(), GetLength(), o.GetLength()) :
+      nullptr;
   return Value{GetType(), val, len};
 }
 
@@ -197,35 +195,24 @@ Value Value::LogicalOr(CodeGen &codegen, const Value &o) const {
 }
 
 //===----------------------------------------------------------------------===//
-// Generate a hash for the given value
+// Generate values for materialization and hash
 //===----------------------------------------------------------------------===//
-void Value::ValuesForHash(llvm::Value *&val, llvm::Value *&len) const {
+void Value::GetValue(llvm::Value *&val, llvm::Value *&len) const {
   val = GetValue();
-  if (GetType() == type::Type::TypeId::VARCHAR ||
-      GetType() == type::Type::TypeId::VARBINARY) {
-    len = GetLength();
-  } else {
-    len = nullptr;
-  }
+  len = Type::HasVariableLength(GetType()) ? GetLength() : nullptr;
 }
 
-//===----------------------------------------------------------------------===//
-// Generate a hash for the given value
-//===----------------------------------------------------------------------===//
-void Value::ValuesForMaterialization(llvm::Value *&val, llvm::Value *&len,
-                                     llvm::Value *&null) const {
+void Value::GetValue(llvm::Value *&val, llvm::Value *&len,
+                     llvm::Value *&null) const {
   PL_ASSERT(type_ != type::Type::TypeId::INVALID);
-  val = GetValue();
-  len = GetType() == type::Type::TypeId::VARCHAR ? GetLength() : nullptr;
+  GetValue(val, len);
   null = GetNull();
 }
 
-// Return the value that can be
-Value Value::ValueFromMaterialization(type::Type::TypeId type, llvm::Value *val,
-                                      llvm::Value *len, llvm::Value *null) {
+Value Value::BuildValue(type::Type::TypeId type, llvm::Value *val,
+                        llvm::Value *len, llvm::Value *null) {
   PL_ASSERT(type != type::Type::TypeId::INVALID);
-  return Value{type, val, type == type::Type::TypeId::VARCHAR ? len : nullptr,
-               null};
+  return Value{type, val, Type::HasVariableLength(type) ? len : nullptr, null};
 }
 
 llvm::Value *Value::SetNullValue(CodeGen &codegen, const Value &value) {

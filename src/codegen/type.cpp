@@ -1233,33 +1233,7 @@ Value Type::GetMaxValue(CodeGen &codegen, type::Type::TypeId type_id) {
 }
 
 Value Type::GetNullValue(CodeGen &codegen, type::Type::TypeId type_id) {
-  switch (type_id) {
-    case type::Type::TypeId::BOOLEAN:
-      return Value{type_id, codegen.ConstBool(type::PELOTON_BOOLEAN_NULL)};
-    case type::Type::TypeId::TINYINT:
-      return Value{type_id, codegen.Const8(type::PELOTON_INT8_NULL)};
-    case type::Type::TypeId::SMALLINT:
-      return Value{type_id, codegen.Const16(type::PELOTON_INT16_NULL)};
-    case type::Type::TypeId::INTEGER:
-      return Value{type_id, codegen.Const32(type::PELOTON_INT32_NULL)};
-    case type::Type::TypeId::BIGINT:
-      return Value{type_id, codegen.Const64(type::PELOTON_INT64_NULL)};
-    case type::Type::TypeId::DECIMAL:
-      return Value{type_id, codegen.ConstDouble(type::PELOTON_DECIMAL_NULL)};
-    case type::Type::TypeId::DATE:
-      return Value{type_id, codegen.Const32(type::PELOTON_DATE_NULL)};
-    case type::Type::TypeId::TIMESTAMP:
-      return Value{type_id, codegen.Const64(type::PELOTON_TIMESTAMP_NULL)};
-    case type::Type::TypeId::VARBINARY:
-    case type::Type::TypeId::VARCHAR:
-      return Value{type_id, codegen.NullPtr(codegen.CharPtrType()),
-                   codegen.Const32(0)};
-    default: {
-      auto msg = StringUtil::Format("No null value for type '%s'",
-                                    TypeIdToString(type_id).c_str());
-      throw Exception{EXCEPTION_TYPE_UNKNOWN_TYPE, msg};
-    }
-  }
+  return Value{type_id, GetNullLLVMValue(codegen, type_id)};
 }
 
 Value Type::GetDefaultValue(CodeGen &codegen, type::Type::TypeId type_id) {
@@ -1319,6 +1293,37 @@ const Type::BinaryOperator *Type::GetBinaryOperator(
       TypeIdToString(left_type).c_str(), TypeIdToString(right_type).c_str());
   throw Exception{msg};
 }
+
+llvm::Value *Type::GetNullLLVMValue(CodeGen &codegen,
+                                    type::Type::TypeId type_id) {
+  switch (type_id) {
+    case type::Type::TypeId::BOOLEAN:
+      return codegen.ConstBool(type::PELOTON_BOOLEAN_NULL);
+    case type::Type::TypeId::TINYINT:
+      return codegen.Const8(type::PELOTON_INT8_NULL);
+    case type::Type::TypeId::SMALLINT:
+      return codegen.Const16(type::PELOTON_INT16_NULL);
+    case type::Type::TypeId::INTEGER:
+      return codegen.Const32(type::PELOTON_INT32_NULL);
+    case type::Type::TypeId::BIGINT:
+      return codegen.Const64(type::PELOTON_INT64_NULL);
+    case type::Type::TypeId::DECIMAL:
+      return codegen.ConstDouble(type::PELOTON_DECIMAL_NULL);
+    case type::Type::TypeId::DATE:
+      return codegen.Const32(type::PELOTON_DATE_NULL);
+    case type::Type::TypeId::TIMESTAMP:
+      return codegen.Const64(type::PELOTON_TIMESTAMP_NULL);
+    case type::Type::TypeId::VARBINARY:
+    case type::Type::TypeId::VARCHAR:
+      return codegen.NullPtr(codegen.CharPtrType());
+    default: {
+      auto msg = StringUtil::Format("No null value for type '%s'",
+                                    TypeIdToString(type_id).c_str());
+      throw Exception{EXCEPTION_TYPE_UNKNOWN_TYPE, msg};
+    }
+  }
+}
+
 
 }  // namespace codegen
 }  // namespace peloton

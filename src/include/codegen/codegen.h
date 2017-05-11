@@ -135,6 +135,9 @@ class CodeGen {
   // Get the context where all the code we generate resides
   CodeContext &GetCodeContext() const { return code_context_; }
 
+  // Get the null value based on the type
+  llvm::Value *GetNullValue(llvm::Type *type) const;
+
  private:
   friend class Hash;
   friend class Value;

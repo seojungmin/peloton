@@ -55,9 +55,9 @@ bool QueryCompiler::IsSupported(const planner::AbstractPlan &plan,
       break;
     }
     case PlanNodeType::HASHJOIN: {
-      const auto &hjp = static_cast<const planner::HashJoinPlan &>(plan);
+      const auto &hj_plan = static_cast<const planner::HashJoinPlan &>(plan);
       // Right now, only support inner joins
-      if (hjp.GetJoinType() == JoinType::INNER) {
+      if (hj_plan.GetJoinType() == JoinType::INNER) {
         break;
       }
     }
@@ -73,15 +73,23 @@ bool QueryCompiler::IsSupported(const planner::AbstractPlan &plan,
 
   // Check the predicate is compilable
   const expression::AbstractExpression *pred = nullptr;
-  if (plan.GetPlanNodeType() == PlanNodeType::SEQSCAN) {
-    auto &scan_plan = static_cast<const planner::SeqScanPlan &>(plan);
-    pred = scan_plan.GetPredicate();
-  } else if (plan.GetPlanNodeType() == PlanNodeType::AGGREGATE_V2) {
-    auto &order_by_plan = static_cast<const planner::AggregatePlan &>(plan);
-    pred = order_by_plan.GetPredicate();
-  } else if (plan.GetPlanNodeType() == PlanNodeType::HASHJOIN) {
-    auto &order_by_plan = static_cast<const planner::HashJoinPlan &>(plan);
-    pred = order_by_plan.GetPredicate();
+  switch (plan.GetPlanNodeType()) {
+    case PlanNodeType::SEQSCAN: {
+      const auto &scan_plan = static_cast<const planner::SeqScanPlan &>(plan);
+      pred = scan_plan.GetPredicate();
+      break;
+    }
+    case PlanNodeType::AGGREGATE_V2: {
+      const auto &agg_plan = static_cast<const planner::AggregatePlan &>(plan);
+      pred = agg_plan.GetPredicate();
+      break;
+    }
+    case PlanNodeType::HASHJOIN: {
+      const auto &hj_plan = static_cast<const planner::HashJoinPlan &>(plan);
+      pred = hj_plan.GetPredicate();
+      break;
+    }
+    default: {}
   }
 
   if (pred != nullptr && !IsExpressionSupported(*pred)) {

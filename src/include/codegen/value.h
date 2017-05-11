@@ -105,26 +105,18 @@ class Value {
   // Materialization helpers
   //===--------------------------------------------------------------------===//
 
-  // Return the a representation of this value suitable for materialization
-  void ValuesForMaterialization(llvm::Value *&val, llvm::Value *&len,
-                                llvm::Value *&null) const;
+  // Return a representation of this value, e.g. suitable for materialization
+  void GetValue(llvm::Value *&val, llvm::Value *&len, llvm::Value *&null) const;
 
-  // Return a value that can be constructed from the provided type and value
-  // registers
-  static Value ValueFromMaterialization(type::Type::TypeId type,
-                                        llvm::Value *val, llvm::Value *len,
-                                        llvm::Value *null);
+  // Return a representation of this value, e.g. suitable for hash
+  void GetValue(llvm::Value *&val, llvm::Value *&len) const;
+
+  // Return a value constructed from the provided type and value registers
+  static Value BuildValue(type::Type::TypeId type, llvm::Value *val,
+                          llvm::Value *len, llvm::Value *null);
 
   // Return the null indicator
   static llvm::Value *SetNullValue(CodeGen &codegen, const Value &value);
-
- private:
-  friend class Hash;
-  friend class CompactStorage;
-  friend class UpdateableStorage;
-
-  // Generate a hash for the given value
-  void ValuesForHash(llvm::Value *&val, llvm::Value *&len) const;
 
  private:
   // The SQL type

@@ -132,6 +132,10 @@ class Type {
   static Value GetNullValue(CodeGen &codegen, type::Type::TypeId type_id);
   static Value GetDefaultValue(CodeGen &codegen, type::Type::TypeId type_id);
 
+  // Get the null LLVM value for the given type
+  static llvm::Value *GetNullLLVMValue(CodeGen &codegen,
+                                       type::Type::TypeId type_id);
+
   // Get the LLVM types used to materialize a SQL value of the given type
   static void GetTypeForMaterialization(CodeGen &codegen,
                                         type::Type::TypeId type_id,

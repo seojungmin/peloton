@@ -37,7 +37,7 @@ llvm::Value *Hash::HashValues(CodeGen &codegen,
   for (const auto &value : vals) {
     llvm::Value *val = nullptr;
     llvm::Value *len = nullptr;
-    value.ValuesForHash(val, len);
+    value.GetValue(val, len);
     PL_ASSERT(val != nullptr);
 
     llvm::Type *val_type = val->getType();

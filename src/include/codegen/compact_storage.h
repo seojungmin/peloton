@@ -63,8 +63,10 @@ class CompactStorage {
     // The index in the format that this entry is associated with
     uint32_t index;
 
-    // Indicates whether this is the length component of a variable length entry
-    bool is_length;
+    // Indicates whether this is the variable type, so that the next entry is
+    // the corresponding length entry.  This is implicitly implemented in the 
+    // code as in the previous implmentation.
+    bool is_var;
 
     // The size in bytes this entry occupies
     uint32_t nbytes;
