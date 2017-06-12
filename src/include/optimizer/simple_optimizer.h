@@ -64,6 +64,10 @@ class SimpleOptimizer : public AbstractOptimizer {
       const std::unique_ptr<parser::SQLStatementList> &parse_tree) override;
 
  private:
+
+  std::shared_ptr<planner::AbstractPlan> BuildPelotonPlanTree(
+      parser::SQLStatement *parse_tree);
+
   //===--------------------------------------------------------------------===//
   // UTILITIES
   //===--------------------------------------------------------------------===//
@@ -125,6 +129,7 @@ class SimpleOptimizer : public AbstractOptimizer {
   std::unique_ptr<planner::AbstractPlan> CreateOrderByPlan(
       parser::SelectStatement *select_stmt, planner::AbstractPlan *child_plan,
       catalog::Schema *schema, std::vector<oid_t> column_ids, bool is_star);
+
 };
 }  // namespace optimizer
 }  // namespace peloton

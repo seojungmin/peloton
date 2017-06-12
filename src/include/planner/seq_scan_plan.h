@@ -65,7 +65,9 @@ class SeqScanPlan : public AbstractScan {
 
   std::unique_ptr<AbstractPlan> Copy() const {
     AbstractPlan *new_plan = new SeqScanPlan(
-        this->GetTable(), this->GetPredicate()->Copy(), this->GetColumnIds());
+        this->GetTable(),
+        this->GetPredicate()==nullptr ? nullptr : this->GetPredicate()->Copy(),
+        this->GetColumnIds());
     return std::unique_ptr<AbstractPlan>(new_plan);
   }
 

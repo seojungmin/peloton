@@ -60,23 +60,31 @@ SimpleOptimizer::~SimpleOptimizer(){};
 
 std::shared_ptr<planner::AbstractPlan> SimpleOptimizer::BuildPelotonPlanTree(
     const std::unique_ptr<parser::SQLStatementList>& parse_tree) {
+
   std::shared_ptr<planner::AbstractPlan> plan_tree;
 
   // Base Case
   if (parse_tree->GetStatements().size() == 0) return plan_tree;
 
-  std::unique_ptr<planner::AbstractPlan> child_plan = nullptr;
-
   // One to one Mapping
-  auto stmt_type = parse_tree->GetStatements().at(0)->GetType();
-
   auto parse_tree2 = parse_tree->GetStatements().at(0);
 
+  return BuildPelotonPlanTree(parse_tree2);
+}
+
+
+std::shared_ptr<planner::AbstractPlan> SimpleOptimizer::BuildPelotonPlanTree(
+    parser::SQLStatement *parse_tree) {
+
+  std::shared_ptr<planner::AbstractPlan> plan_tree;
+
+  auto stmt_type = parse_tree->GetType();
+  std::unique_ptr<planner::AbstractPlan> child_plan = nullptr;
   switch (stmt_type) {
     case StatementType::DROP: {
       LOG_TRACE("Adding Drop plan...");
       std::unique_ptr<planner::AbstractPlan> child_DropPlan(
-          new planner::DropPlan((parser::DropStatement*)parse_tree2));
+          new planner::DropPlan((parser::DropStatement*)parse_tree));
       child_plan = std::move(child_DropPlan);
     } break;
 
@@ -84,12 +92,12 @@ std::shared_ptr<planner::AbstractPlan> SimpleOptimizer::BuildPelotonPlanTree(
       LOG_TRACE("Adding Create plan...");
 
       auto create_plan =
-          new planner::CreatePlan((parser::CreateStatement*)parse_tree2);
+          new planner::CreatePlan((parser::CreateStatement*)parse_tree);
       std::unique_ptr<planner::AbstractPlan> child_CreatePlan(create_plan);
       child_plan = std::move(child_CreatePlan);
       // If creating index, populate with existing data first.
       if (create_plan->GetCreateType() == peloton::CreateType::INDEX) {
-        auto create_stmt = (parser::CreateStatement*)parse_tree2;
+        auto create_stmt = (parser::CreateStatement*)parse_tree;
         auto target_table = catalog::Catalog::GetInstance()->GetTableWithName(
             create_stmt->GetDatabaseName(), create_stmt->GetTableName());
         std::vector<oid_t> column_ids;
@@ -112,7 +120,7 @@ std::shared_ptr<planner::AbstractPlan> SimpleOptimizer::BuildPelotonPlanTree(
 
     case StatementType::SELECT: {
       LOG_TRACE("Processing SELECT...");
-      auto select_stmt = (parser::SelectStatement*)parse_tree2;
+      auto select_stmt = (parser::SelectStatement*)parse_tree;
       LOG_TRACE("SELECT Info: %s", select_stmt->GetInfo().c_str());
       auto agg_type = AggregateType::PLAIN;  // default aggregator
       std::vector<oid_t> group_by_columns;
@@ -506,23 +514,31 @@ std::shared_ptr<planner::AbstractPlan> SimpleOptimizer::BuildPelotonPlanTree(
     case StatementType::INSERT: {
       LOG_TRACE("Adding Insert plan...");
       parser::InsertStatement* insertStmt =
-          (parser::InsertStatement*)parse_tree2;
+          (parser::InsertStatement*)parse_tree;
 
       storage::DataTable* target_table =
           catalog::Catalog::GetInstance()->GetTableWithName(
               insertStmt->GetDatabaseName(), insertStmt->GetTableName());
 
-      std::unique_ptr<planner::AbstractPlan> child_InsertPlan(
+      std::unique_ptr<planner::AbstractPlan> child_InsertPlan;
+      if (insertStmt->select != nullptr) {
+        child_InsertPlan.reset(new planner::InsertPlan(target_table));
+        std::unique_ptr<planner::AbstractPlan> child_Plan (std::move(
+            BuildPelotonPlanTree(insertStmt->select)->Copy()));
+        child_InsertPlan->AddChild(std::move(child_Plan));
+      }
+      else {
+        child_InsertPlan.reset(
           new planner::InsertPlan(target_table, insertStmt->columns,
                                   insertStmt->insert_values));
-
+      }
       child_plan = std::move(child_InsertPlan);
     } break;
 
     case StatementType::COPY: {
       LOG_TRACE("Adding Copy plan...");
       parser::CopyStatement* copy_parse_tree =
-          static_cast<parser::CopyStatement*>(parse_tree2);
+          static_cast<parser::CopyStatement*>(parse_tree);
       child_plan = std::move(CreateCopyPlan(copy_parse_tree));
     } break;
 
@@ -536,7 +552,7 @@ std::shared_ptr<planner::AbstractPlan> SimpleOptimizer::BuildPelotonPlanTree(
       oid_t index_id;
 
       parser::DeleteStatement* deleteStmt =
-          (parser::DeleteStatement*)parse_tree2;
+          (parser::DeleteStatement*)parse_tree;
       auto target_table = catalog::Catalog::GetInstance()->GetTableWithName(
           deleteStmt->GetDatabaseName(), deleteStmt->GetTableName());
       if (CheckIndexSearchable(target_table, deleteStmt->expr, key_column_ids,
@@ -601,7 +617,7 @@ std::shared_ptr<planner::AbstractPlan> SimpleOptimizer::BuildPelotonPlanTree(
       oid_t index_id;
 
       parser::UpdateStatement* updateStmt =
-          (parser::UpdateStatement*)parse_tree2;
+          (parser::UpdateStatement*)parse_tree;
       auto target_table = catalog::Catalog::GetInstance()->GetTableWithName(
           updateStmt->table->GetDatabaseName(),
           updateStmt->table->GetTableName());
