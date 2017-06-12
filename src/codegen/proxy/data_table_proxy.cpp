@@ -38,14 +38,13 @@ llvm::Type* DataTableProxy::GetType(CodeGen& codegen) {
 }
 
 const std::string& DataTableProxy::_GetTileGroupCount::GetFunctionName() {
-  // TODO: FIX ME
-  static const std::string kGetTileGroupCount =
+  static const std::string kGetTileGroupCountFnName =
 #ifdef __APPLE__
-      "_ZNK7peloton7storage9DataTable17GetTileGroupCountEvy";
+      "_ZNK7peloton7storage9DataTable17GetTileGroupCountEv";
 #else
       "_ZNK7peloton7storage9DataTable17GetTileGroupCountEv";
 #endif
-  return kGetTileGroupCount;
+  return kGetTileGroupCountFnName;
 }
 
 llvm::Function* DataTableProxy::_GetTileGroupCount::GetFunction(
