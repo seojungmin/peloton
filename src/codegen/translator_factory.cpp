@@ -26,6 +26,7 @@
 #include "codegen/projection_translator.h"
 #include "codegen/table_scan_translator.h"
 #include "codegen/tuple_value_translator.h"
+#include "codegen/update_translator.h"
 #include "expression/case_expression.h"
 #include "expression/comparison_expression.h"
 #include "expression/conjunction_expression.h"
@@ -33,10 +34,12 @@
 #include "expression/operator_expression.h"
 #include "expression/tuple_value_expression.h"
 #include "planner/aggregate_plan.h"
+#include "planner/delete_plan.h"
 #include "planner/hash_join_plan.h"
 #include "planner/order_by_plan.h"
 #include "planner/projection_plan.h"
 #include "planner/seq_scan_plan.h"
+#include "planner/update_plan.h"
 
 namespace peloton {
 namespace codegen {
@@ -89,6 +92,11 @@ std::unique_ptr<OperatorTranslator> TranslatorFactory::CreateTranslator(
       auto &delete_plan = const_cast<planner::DeletePlan &>(
           static_cast<const planner::DeletePlan &>(plan_node));
       translator = new DeleteTranslator(delete_plan, context, pipeline);
+      break;
+    }
+    case PlanNodeType::UPDATE: {
+      auto &update_plan = static_cast<const planner::UpdatePlan &>(plan_node);
+      translator = new UpdateTranslator(update_plan, context, pipeline);
       break;
     }
     default: {

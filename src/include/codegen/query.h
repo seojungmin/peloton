@@ -15,6 +15,8 @@
 #include "codegen/code_context.h"
 #include "codegen/runtime_state.h"
 #include "executor/executor_context.h"
+#include "executor/executor_context.h"
+#include "type/types.h"
 
 namespace peloton {
 
@@ -65,6 +67,10 @@ class Query {
   // The class tracking all the state needed by this query
   RuntimeState &GetRuntimeState() { return runtime_state_; }
 
+  void StoreTargetList(TargetList &target_list);
+
+  void StoreDirectList(DirectMapList &direct_list);
+
  private:
   friend class QueryCompiler;
 
@@ -86,6 +92,10 @@ class Query {
   compiled_function_t init_func_;
   compiled_function_t plan_func_;
   compiled_function_t tear_down_func_;
+
+  // FIXME
+  TargetList update_target_list_;
+  DirectMapList update_direct_map_list_;
 
  private:
   // This class cannot be copy or move-constructed

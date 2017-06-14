@@ -63,6 +63,14 @@ class CompilationContext {
   // the plan and prepare the provided query statement.
   void GeneratePlan(QueryCompiler::CompileStats *stats);
 
+  void StoreTargetList(TargetList &target_list) { 
+    query_.StoreTargetList(target_list);
+  }
+
+  void StoreDirectList(DirectMapList &direct_list) {
+    query_.StoreDirectList(direct_list);
+  }
+
   //===--------------------------------------------------------------------===//
   // ACCESSORS
   //===--------------------------------------------------------------------===//

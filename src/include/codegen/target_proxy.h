@@ -2,9 +2,9 @@
 //
 //                         Peloton
 //
-// executor_context_proxy.h
+// target_proxy.h
 //
-// Identification: src/include/codegen/executor_context_proxy.h
+// Identification: src/include/codegen/target_proxy.h
 //
 // Copyright (c) 2015-17, Carnegie Mellon University Database Group
 //
@@ -13,29 +13,29 @@
 #pragma once
 
 #include "codegen/codegen.h"
-#include "executor/executor_context.h"
+#include "planner/project_info.h"
+#include "type/types.h"
 
 namespace peloton {
 namespace codegen {
 
-class ExecutorContextProxy {
+class TargetProxy {
  public:
-  // Get the LLVM type for ExecutorContext
+  // Get the LLVM type for Target
   static llvm::Type *GetType(CodeGen &codegen) {
-    static const std::string kExecutorContextName =
-        "peloton::executor::ExecutorContext";
+    static const std::string kTargetName = "peloton::Target";
     // Check if the data table type has already been registered in the current
     // codegen context
-    auto executor_context_type = codegen.LookupTypeByName(kExecutorContextName);
-    if (executor_context_type != nullptr) {
-      return executor_context_type;
+    auto target_type = codegen.LookupTypeByName(kTargetName);
+    if (target_type != nullptr) {
+      return target_type;
     }
 
     // Type isn't cached, create a new one
-    auto *opaque_byte_array = llvm::ArrayType::get(codegen.Int8Type(),
-        sizeof(executor::ExecutorContext));
+    auto *opaque_byte_array =
+        llvm::ArrayType::get(codegen.Int8Type(), sizeof(peloton::Target));
     return llvm::StructType::create(codegen.GetContext(), {opaque_byte_array},
-                                    kExecutorContextName);
+                                    kTargetName);
   }
 };
 
