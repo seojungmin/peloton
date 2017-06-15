@@ -41,31 +41,29 @@ class UpdateTranslator : public OperatorTranslator {
   void Consume(ConsumerContext &context, RowBatch::Row &row) const override;
 
   // No state finalization
-  void TearDownState() override;
+  void TearDownState() override {}
 
   // Get the stringified name of this translator
   std::string GetName() const override { return "Update"; }
+
+ private:
+  // Set target value
+  void SetTargetValue(llvm::Value *target_val_vec, llvm::Value *target_id,
+                      type::Type::TypeId type, llvm::Value *value,
+                      llvm::Value *length) const;
 
  private:
   const planner::UpdatePlan &update_plan_;
 
   storage::DataTable *target_table_;
   bool update_primary_key_;
-  TargetList target_list_;
-  DirectMapList direct_map_list_;
+  TargetList *target_list_;
+  DirectMapList *direct_map_list_;
+
+  RuntimeState::StateID target_val_vec_id_;
+  RuntimeState::StateID column_id_vec_id_;
 
   RuntimeState::StateID updater_state_id_;
-
-//
-  std::unique_ptr<Target[]> target_array;
-  std::unique_ptr<DirectMap[]> direct_array;
-  RuntimeState::StateID target_val_vec_id_;
-  RuntimeState::StateID col_id_vec_id_;
-
-  RuntimeState::StateID target_list_state_id_;
-  RuntimeState::StateID direct_map_list_state_id_;
-
-  codegen::Table table_; // usage?
 };
 
 }  // namespace codegen

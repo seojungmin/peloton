@@ -157,7 +157,7 @@ void DoProjection(AbstractTuple *dest, const AbstractTuple *tuple,
 
 void DoProjection(storage::Tuple *dest, const AbstractTuple *tuple,
                   type::Value *values, uint32_t *col_ids, uint32_t target_size,
-                  DirectMapList direct_list,
+                  DirectMapList direct_map_list,
                   executor::ExecutorContext *context = nullptr) {
   // Get varlen pool
   type::AbstractPool *pool = nullptr;
@@ -169,7 +169,7 @@ void DoProjection(storage::Tuple *dest, const AbstractTuple *tuple,
   }
 
   // Execute direct map
-  for (auto dm : direct_list) {
+  for (auto dm : direct_map_list) {
     auto dest_col_id = dm.first;
     auto src_col_id = dm.second.second;
 
@@ -181,16 +181,17 @@ void DoProjection(storage::Tuple *dest, const AbstractTuple *tuple,
 bool PerformUpdatePrimaryKey(concurrency::Transaction *current_txn,
                              bool is_owner,
                              storage::TileGroupHeader *tile_group_hdr,
-                             storage::DataTable *target_table,
-                             oid_t physical_tuple_id, ItemPointer &old_location,
+                             storage::DataTable &table,
+                             oid_t tuple_offset, ItemPointer &old_location,
                              storage::TileGroup *tile_group,
                              type::Value *values, uint32_t *col_ids,
-                             uint32_t target_size, DirectMapList direct_list_,
+                             uint32_t target_size,
+                             DirectMapList direct_map_list,
                              executor::ExecutorContext *exec_context) {
   auto &txn_mgr = concurrency::TransactionManagerFactory::GetInstance();
 
   // Delete tuple/version chain
-  ItemPointer new_location = target_table->InsertEmptyVersion();
+  ItemPointer new_location = table.InsertEmptyVersion();
 
   // PerformUpdate() will not be executed if the insertion failed.
   // There is a write lock acquired, but since it is not in the write set,
@@ -202,7 +203,7 @@ bool PerformUpdatePrimaryKey(concurrency::Transaction *current_txn,
     if (is_owner == false) {
       // If the ownership is acquire inside this update executor, we
       // release it here
-      txn_mgr.YieldOwnership(current_txn, tile_group_hdr, physical_tuple_id);
+      txn_mgr.YieldOwnership(current_txn, tile_group_hdr, tuple_offset);
     }
     txn_mgr.SetTransactionResult(current_txn, ResultType::FAILURE);
     return false;
@@ -212,20 +213,20 @@ bool PerformUpdatePrimaryKey(concurrency::Transaction *current_txn,
   ////////////////////////////////////////////
   // Insert tuple rather than install version
   ////////////////////////////////////////////
-  auto target_table_schema = target_table->GetSchema();
+  auto target_table_schema = table.GetSchema();
 
   storage::Tuple new_tuple(target_table_schema, true);
 
   expression::ContainerTuple<storage::TileGroup> old_tuple(tile_group,
-                                                           physical_tuple_id);
+                                                           tuple_offset);
 
   DoProjection(&new_tuple, &old_tuple, values, col_ids, target_size,
-               direct_list_, exec_context);
+               direct_map_list, exec_context);
 
   // insert tuple into the table.
   ItemPointer *index_entry_ptr = nullptr;
   peloton::ItemPointer location =
-      target_table->InsertTuple(&new_tuple, current_txn, &index_entry_ptr);
+      table.InsertTuple(&new_tuple, current_txn, &index_entry_ptr);
 
   // it is possible that some concurrent transactions have inserted the
   // same tuple.
@@ -241,180 +242,131 @@ bool PerformUpdatePrimaryKey(concurrency::Transaction *current_txn,
   return true;
 }
 
-bool TransactionRuntime::PerformUpdate(
-    concurrency::Transaction &txn, storage::DataTable *target_table,
-    storage::TileGroup &tile_group, uint32_t physical_tuple_id,
-    uint32_t *col_ids, type::Value *target_vals, bool update_primary_key,
-    Target *target_list, uint32_t target_list_size, DirectMap *direct_list,
-    uint32_t direct_list_size, executor::ExecutorContext *executor_context_) {
+bool TransactionRuntime::PerformUpdate(concurrency::Transaction &txn,
+    storage::DataTable &table, uint32_t tile_group_id,
+    uint32_t tuple_offset, uint32_t *col_ids, type::Value *target_vals,
+    bool update_primary_key, Target *target_vector, uint32_t target_vector_size,
+    DirectMap *direct_map_vector, uint32_t direct_map_vector_size,
+    executor::ExecutorContext *executor_context) {
 
-  storage::TileGroupHeader *tile_group_hdr= tile_group.GetHeader();
-  auto tile_group_id = tile_group.GetTileGroupId();
+  // Preparation for the upcoming executions
+  auto tile_group = table.GetTileGroupById(tile_group_id).get();
+  storage::TileGroupHeader *tile_group_hdr = tile_group->GetHeader();
 
-  auto &txn_mgr =
-      concurrency::TransactionManagerFactory::GetInstance();
-
-  TargetList target_list_;
-  for (uint32_t i = 0; i < target_list_size; i++) {
-    target_list_.emplace_back(target_list[i]);
+  TargetList target_list;
+  for (uint32_t i = 0; i < target_vector_size; i++) {
+    target_list.emplace_back(target_vector[i]);
   }
-  DirectMapList direct_list_;
-  for (uint32_t i = 0; i < direct_list_size; i++) {
-    direct_list_.emplace_back(direct_list[i]);
+  DirectMapList direct_map_list;
+  for (uint32_t i = 0; i < direct_map_vector_size; i++) {
+    direct_map_list.emplace_back(direct_map_vector[i]);
   }
 
-  // Update tuple in a given table
+  ItemPointer old_location(tile_group_id, tuple_offset);
 
-  ItemPointer old_location(tile_group_id, physical_tuple_id);
+  auto &txn_mgr = concurrency::TransactionManagerFactory::GetInstance();
 
-  bool is_owner = txn_mgr.IsOwner(&txn, tile_group_hdr, physical_tuple_id);
-  bool is_written = txn_mgr.IsWritten(&txn, tile_group_hdr, physical_tuple_id);
-
+  bool is_owner = txn_mgr.IsOwner(&txn, tile_group_hdr, tuple_offset);
+  bool is_written = txn_mgr.IsWritten(&txn, tile_group_hdr, tuple_offset);
   PL_ASSERT((is_owner == false && is_written == true) == false);
 
-  // Prepare to examine primary key
+  // We have already owned a version
   bool ret = false;
-
   if (is_owner == true && is_written == true) {
-    if (update_primary_key) {
-      // Update primary key
-      ret = PerformUpdatePrimaryKey(
-          &txn, is_owner, tile_group_hdr, target_table,
-          physical_tuple_id, old_location, &tile_group, target_vals, col_ids,
-          target_list_size, direct_list_, executor_context_);
-
-      // Examine the result
-      if (ret == true) {
-        executor_context_->num_processed += 1;  // updated one
-      }
-      // When fail, ownership release is done inside PerformUpdatePrimaryKey
-      else {
-        return false;
-      }
+    if (update_primary_key == true) {
+      ret = PerformUpdatePrimaryKey(&txn, is_owner, tile_group_hdr, table,
+          tuple_offset, old_location, tile_group, target_vals, col_ids,
+          target_vector_size, direct_map_list, executor_context);
     }
-
-    // Normal update (no primary key)
     else {
-      // We have already owned a version
-
       // Make a copy of the original tuple and allocate a new tuple
       expression::ContainerTuple<storage::TileGroup> old_tuple(
-          &tile_group, physical_tuple_id);
-      // Execute the projections
+          tile_group, tuple_offset);
       DoProjection(&old_tuple, &old_tuple, target_vals, col_ids,
-                   target_list_size, direct_list_, executor_context_);
-
+                   target_vector_size, direct_map_list, executor_context);
       txn_mgr.PerformUpdate(&txn, old_location);
+      ret = true;
     }
+    if (ret == true)
+      executor_context->num_processed += 1;
+    return ret;
   }
-  // if we have already got the ownership
-  else {
-    // Skip the IsOwnable and AcquireOwnership if we have already got the
-    // ownership
-    bool is_ownable = is_owner ||
-                      txn_mgr.IsOwnable(
-                          &txn, tile_group_hdr, physical_tuple_id);
 
-    if (is_ownable == true) {
-      // if the tuple is not owned by any transaction and is visible to
-      // current transaction.
+  // We have not owned a version, but let's see if it is ownerable from now on
+  bool is_ownable = is_owner ||
+                    txn_mgr.IsOwnable(&txn, tile_group_hdr, tuple_offset);
+  if (is_ownable == false) {
+    // transaction should be aborted as we cannot update the latest version.
+    LOG_TRACE("Fail to update tuple. Set txn failure.");
+    txn_mgr.SetTransactionResult(&txn, ResultType::FAILURE);
+    return false;
+  }
 
-      bool acquire_ownership_success =
-          is_owner ||
-          txn_mgr.AcquireOwnership(&txn, tile_group_hdr,
-                                               physical_tuple_id);
+  // if the tuple is not owned by any txn and is visible to current txn
+  bool acquire_ownership_success = is_owner ||
+      txn_mgr.AcquireOwnership(&txn, tile_group_hdr, tuple_offset);
+  if (acquire_ownership_success == false) {
+    LOG_TRACE("Fail to insert new tuple. Set txn failure.");
+    txn_mgr.SetTransactionResult(&txn, ResultType::FAILURE);
+    return false;
+  }
 
-      if (acquire_ownership_success == false) {
-        LOG_TRACE("Fail to insert new tuple. Set txn failure.");
-        txn_mgr.SetTransactionResult(&txn,
-                                                 ResultType::FAILURE);
-        return false;
-      }
+  if (update_primary_key == true) {
+    ret = PerformUpdatePrimaryKey(&txn, is_owner, tile_group_hdr, table,
+        tuple_offset, old_location, tile_group, target_vals, col_ids,
+        target_vector_size, direct_map_list, executor_context);
+    if (ret == true)
+      executor_context->num_processed += 1;
+    return ret;
+  }
 
-      if (update_primary_key) {
-        // Update primary key
-        ret = PerformUpdatePrimaryKey(
-            &txn, is_owner, tile_group_hdr, target_table,
-            physical_tuple_id, old_location, &tile_group, target_vals, col_ids,
-            target_list_size, direct_list_, executor_context_);
+  // if it is the latest version and not locked by other threads, then
+  // insert a new version.
+  // acquire a version slot from the table.
+  ItemPointer new_location = table.AcquireVersion();
 
-        if (ret == true) {
-          executor_context_->num_processed += 1;  // updated one
-        }
-        // When fail, ownership release is done inside PerformUpdatePrimaryKey
-        else {
-          return false;
-        }
-      }
+  auto &manager = catalog::Manager::GetInstance();
+  auto new_tile_group = manager.GetTileGroup(new_location.block);
+  expression::ContainerTuple<storage::TileGroup> new_tuple(
+      new_tile_group.get(), new_location.offset);
+  expression::ContainerTuple<storage::TileGroup> old_tuple(
+      tile_group, tuple_offset);
 
-      // Normal update (no primary key)
-      else {
-        // if it is the latest version and not locked by other threads, then
-        // insert a new version.
+  // Perform projection from old version to new version.
+  // this triggers in-place update, and we do not need to allocate
+  // another version.
+  DoProjection(&new_tuple, &old_tuple, target_vals, col_ids,
+               target_vector_size, direct_map_list, executor_context);
 
-        // acquire a version slot from the table.
-        ItemPointer new_location = target_table->AcquireVersion();
+  ItemPointer *indirection =
+      tile_group_hdr->GetIndirection(old_location.offset);
 
-        auto &manager = catalog::Manager::GetInstance();
-        auto new_tile_group = manager.GetTileGroup(new_location.block);
+  ret = table.InstallVersion(&new_tuple, &target_list, &txn, indirection);
 
-        expression::ContainerTuple<storage::TileGroup> new_tuple(
-            new_tile_group.get(), new_location.offset);
-
-        expression::ContainerTuple<storage::TileGroup> old_tuple(
-            &tile_group, physical_tuple_id);
-
-        // perform projection from old version to new version.
-        // this triggers in-place update, and we do not need to allocate
-        // another version.
-        DoProjection(&new_tuple, &old_tuple, target_vals, col_ids,
-                     target_list_size, direct_list_, executor_context_);
-
-        // get indirection.
-        ItemPointer *indirection =
-            tile_group_hdr->GetIndirection(old_location.offset);
-        // finally install new version into the table
-        ret = target_table->InstallVersion(&new_tuple, &target_list_,
-                                            &txn, indirection);
-
-        // PerformUpdate() will not be executed if the insertion failed.
-        // There is a write lock acquired, but since it is not in the write
-        // set,
-        // because we haven't yet put them into the write set.
-        // the acquired lock can't be released when the txn is aborted.
-        // the YieldOwnership() function helps us release the acquired write
-        // lock.
-        if (ret == false) {
-          LOG_TRACE("Fail to insert new tuple. Set txn failure.");
-          if (is_owner == false) {
-            // If the ownership is acquire inside this update executor, we
-            // release it here
-            txn_mgr.YieldOwnership(&txn, tile_group_hdr,
-                                               physical_tuple_id);
-          }
-          txn_mgr.SetTransactionResult(&txn,
-                                                   ResultType::FAILURE);
-          return false;
-        }
-
-        LOG_TRACE("perform update old location: %u, %u", old_location.block,
-                  old_location.offset);
-        LOG_TRACE("perform update new location: %u, %u", new_location.block,
-                  new_location.offset);
-        txn_mgr.PerformUpdate(&txn, old_location,
-                                          new_location);
-
-        // TODO: Why don't we also do this in the if branch above?
-        executor_context_->num_processed += 1;  // updated one
-      }
-    } else {
-      // transaction should be aborted as we cannot update the latest version.
-      LOG_TRACE("Fail to update tuple. Set txn failure.");
-      txn_mgr.SetTransactionResult(&txn,
-                                               ResultType::FAILURE);
-      return false;
+  // PerformUpdate() will not be executed if the insertion failed.
+  // There is a write lock acquired, but since it is not in the write set,
+  // because we haven't yet put them into the write set.
+  // the acquired lock can't be released when the txn is aborted.
+  // YieldOwnership() function helps us release the acquired write lock.
+  if (ret == false) {
+    LOG_TRACE("Fail to insert new tuple. Set txn failure.");
+    if (is_owner == false) {
+      // If the ownership is acquired inside this update executor, we
+      // release it here
+      txn_mgr.YieldOwnership(&txn, tile_group_hdr, tuple_offset);
     }
+    txn_mgr.SetTransactionResult(&txn, ResultType::FAILURE);
+    return false;
   }
+
+  LOG_TRACE("perform update old location: %u, %u", old_location.block,
+            old_location.offset);
+  LOG_TRACE("perform update new location: %u, %u", new_location.block,
+            new_location.offset);
+  txn_mgr.PerformUpdate(&txn, old_location, new_location);
+
+  // TODO: Why don't we also do this in the if branch above?
+  executor_context->num_processed += 1;  // updated one
   return true;
 }
 

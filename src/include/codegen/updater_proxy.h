@@ -14,8 +14,10 @@
 
 #include "codegen/codegen.h"
 #include "codegen/data_table_proxy.h"
+#include "codegen/executor_context_proxy.h"
 #include "codegen/updater.h"
 #include "codegen/transaction_proxy.h"
+#include "codegen/value_proxy.h"
 
 namespace peloton {
 namespace codegen {
@@ -42,9 +44,9 @@ class UpdaterProxy {
     static const std::string &GetFunctionName() {
       static const std::string kInitFnName =
 #ifdef __APPLE__
-          "";
+          "_ZN7peloton7codegen7Updater4InitEPNS_11concurrency11TransactionEPNS_7storage9DataTableEPSt4pairIjKNS_7planner16DerivedAttributeEEjPS8_IjS8_IjjEEjb";
 #else
-          "";
+          "_ZN7peloton7codegen7Updater4InitEPNS_11concurrency11TransactionEPNS_7storage9DataTableEPSt4pairIjKNS_7planner16DerivedAttributeEEjPS8_IjS8_IjjEEjb";
 #endif
       return kInitFnName;
     }
@@ -59,7 +61,12 @@ class UpdaterProxy {
       std::vector<llvm::Type *> fn_args = {
           UpdaterProxy::GetType(codegen)->getPointerTo(),
           TransactionProxy::GetType(codegen)->getPointerTo(),
-          DataTableProxy::GetType(codegen)->getPointerTo()};
+          DataTableProxy::GetType(codegen)->getPointerTo(),
+          TargetProxy::GetType(codegen)->getPointerTo(),
+          codegen.Int64Type(),
+          DirectMapProxy::GetType(codegen)->getPointerTo(),
+          codegen.Int64Type(),
+          codegen.BoolType()};
       llvm::FunctionType *fn_type =
           llvm::FunctionType::get(codegen.VoidType(), fn_args, false);
       return codegen.RegisterFunction(fn_name, fn_type);
@@ -68,13 +75,13 @@ class UpdaterProxy {
 
   struct _Update {
     static const std::string &GetFunctionName() {
-      static const std::string kInsertFnName =
+      static const std::string kUpdateFnName =
 #ifdef __APPLE__
-          "";
+          "_ZN7peloton7codegen7Updater6UpdateEjjPjPNS_4type5ValueEPNS_8executor15ExecutorContextE";
 #else
-          "";
+          "_ZN7peloton7codegen7Updater6UpdateEjjPjPNS_4type5ValueEPNS_8executor15ExecutorContextE";
 #endif
-      return kInsertFnName;
+      return kUpdateFnName;
     }
     static llvm::Function *GetFunction(CodeGen &codegen) {
       const std::string &fn_name = GetFunctionName();
@@ -86,7 +93,11 @@ class UpdaterProxy {
 
       std::vector<llvm::Type *> fn_args = {
           UpdaterProxy::GetType(codegen)->getPointerTo(),
-          TupleProxy::GetType(codegen)->getPointerTo()};
+          codegen.Int64Type(),
+          codegen.Int32Type(),
+          codegen.Int64Type()->getPointerTo(),
+          ValueProxy::GetType(codegen)->getPointerTo(),
+          ExecutorContextProxy::GetType(codegen)->getPointerTo()};
       llvm::FunctionType *fn_type =
           llvm::FunctionType::get(codegen.VoidType(), fn_args, false);
       return codegen.RegisterFunction(fn_name, fn_type);
