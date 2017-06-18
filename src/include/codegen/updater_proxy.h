@@ -17,6 +17,7 @@
 #include "codegen/executor_context_proxy.h"
 #include "codegen/updater.h"
 #include "codegen/transaction_proxy.h"
+#include "codegen/tile_group_proxy.h"
 #include "codegen/value_proxy.h"
 
 namespace peloton {
@@ -44,9 +45,13 @@ class UpdaterProxy {
     static const std::string &GetFunctionName() {
       static const std::string kInitFnName =
 #ifdef __APPLE__
-          "_ZN7peloton7codegen7Updater4InitEPNS_11concurrency11TransactionEPNS_7storage9DataTableEPSt4pairIjKNS_7planner16DerivedAttributeEEjPS8_IjS8_IjjEEjb";
+          "_ZN7peloton7codegen7Updater4InitEPNS_11concurrency11TransactionEPNS"
+          "_7storage9DataTableEPSt4pairIjKNS_7planner16DerivedAttributeEEjPS8"
+          "_IjS8_IjjEEjb";
 #else
-          "_ZN7peloton7codegen7Updater4InitEPNS_11concurrency11TransactionEPNS_7storage9DataTableEPSt4pairIjKNS_7planner16DerivedAttributeEEjPS8_IjS8_IjjEEjb";
+          "_ZN7peloton7codegen7Updater4InitEPNS_11concurrency11TransactionEPNS"
+          "_7storage9DataTableEPSt4pairIjKNS_7planner16DerivedAttributeEEjPS8"
+          "_IjS8_IjjEEjb";
 #endif
       return kInitFnName;
     }
@@ -62,10 +67,8 @@ class UpdaterProxy {
           UpdaterProxy::GetType(codegen)->getPointerTo(),
           TransactionProxy::GetType(codegen)->getPointerTo(),
           DataTableProxy::GetType(codegen)->getPointerTo(),
-          TargetProxy::GetType(codegen)->getPointerTo(),
-          codegen.Int64Type(),
-          DirectMapProxy::GetType(codegen)->getPointerTo(),
-          codegen.Int64Type(),
+          TargetProxy::GetType(codegen)->getPointerTo(), codegen.Int32Type(),
+          DirectMapProxy::GetType(codegen)->getPointerTo(), codegen.Int32Type(),
           codegen.BoolType()};
       llvm::FunctionType *fn_type =
           llvm::FunctionType::get(codegen.VoidType(), fn_args, false);
@@ -77,9 +80,11 @@ class UpdaterProxy {
     static const std::string &GetFunctionName() {
       static const std::string kUpdateFnName =
 #ifdef __APPLE__
-          "_ZN7peloton7codegen7Updater6UpdateEjjPjPNS_4type5ValueEPNS_8executor15ExecutorContextE";
+          "_ZN7peloton7codegen7Updater6UpdateEPNS_7storage9TileGroupEjPjPNS"
+          "_4type5ValueEPNS_8executor15ExecutorContextE";
 #else
-          "_ZN7peloton7codegen7Updater6UpdateEjjPjPNS_4type5ValueEPNS_8executor15ExecutorContextE";
+          "_ZN7peloton7codegen7Updater6UpdateEPNS_7storage9TileGroupEjPjPNS"
+          "_4type5ValueEPNS_8executor15ExecutorContextE";
 #endif
       return kUpdateFnName;
     }
@@ -93,9 +98,8 @@ class UpdaterProxy {
 
       std::vector<llvm::Type *> fn_args = {
           UpdaterProxy::GetType(codegen)->getPointerTo(),
-          codegen.Int64Type(),
-          codegen.Int32Type(),
-          codegen.Int64Type()->getPointerTo(),
+          TileGroupProxy::GetType(codegen)->getPointerTo(),
+          codegen.Int32Type(), codegen.Int64Type()->getPointerTo(),
           ValueProxy::GetType(codegen)->getPointerTo(),
           ExecutorContextProxy::GetType(codegen)->getPointerTo()};
       llvm::FunctionType *fn_type =

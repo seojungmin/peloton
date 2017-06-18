@@ -31,14 +31,14 @@ void Updater::Init(concurrency::Transaction *txn, storage::DataTable *table,
   target_vector_ = target_vector;
   target_vector_size_ = target_vector_size;
   direct_map_vector_ = direct_map_vector;
-  direct_map_vector_size = direct_map_vector_size;
+  direct_map_vector_size_ = direct_map_vector_size;
 }
 
-void Updater::Update(uint32_t tile_group_id, uint32_t tuple_offset,
+void Updater::Update(storage::TileGroup *tile_group, uint32_t tuple_offset,
                      uint32_t *col_ids, type::Value *target_vals,
                      executor::ExecutorContext *executor_context) {
 
-  TransactionRuntime::PerformUpdate(*txn_, *table_, tile_group_id, tuple_offset,
+  TransactionRuntime::PerformUpdate(*txn_, *table_, tile_group, tuple_offset,
                                     col_ids, target_vals, update_primary_key_,
                                     target_vector_, target_vector_size_,
                                     direct_map_vector_, direct_map_vector_size_,

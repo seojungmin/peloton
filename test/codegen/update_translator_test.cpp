@@ -64,7 +64,7 @@ class UpdateTranslatorTest : public PelotonCodeGenTest {
   uint32_t num_rows_to_insert;
 };
 
-TEST_F(UpdateTranslatorTest, ToConstUpdate) {
+TEST_F(UpdateTranslatorTest, UpdateColumnsWithAConstant) {
   // SET a = 1;
   storage::DataTable *table = &this->GetTestTable(this->TestTableId());
   LOG_DEBUG("Table has %zu tuples", table->GetTupleCount());
@@ -109,17 +109,14 @@ TEST_F(UpdateTranslatorTest, ToConstUpdate) {
                     reinterpret_cast<char *>(buffer.GetState()));
 
   LOG_DEBUG("Table has %zu tuples", table->GetTupleCount());
-  LOG_INFO("%s", table->GetInfo().c_str());
+  LOG_DEBUG("%s", table->GetInfo().c_str());
 
-  // Post-condition
-  EXPECT_EQ(initial_num_rows, table->GetTupleCount());
+  // Post-condition: The table will have twice many, since it also has old ones
+  EXPECT_EQ(initial_num_rows*2, table->GetTupleCount());
 }
 
-/*
- * fuction extracted from simple optimizer
- * Avoid using simple optimizer since codegen currently does not support
- * IndexScan
- */
+// fuction extracted from simple optimizer
+// : Avoided using optimizer - codegen currently does not support IndexScan
 std::shared_ptr<planner::AbstractPlan> BuildUpdatePlanTree(
     const std::unique_ptr<parser::SQLStatementList> &parse_tree) {
   std::shared_ptr<planner::AbstractPlan> plan_tree;
@@ -129,8 +126,6 @@ std::shared_ptr<planner::AbstractPlan> BuildUpdatePlanTree(
   std::unique_ptr<planner::AbstractPlan> child_plan = nullptr;
 
   auto parse_tree2 = parse_tree->GetStatements().at(0);
-
-  LOG_TRACE("Adding Update plan...");
 
   // column predicates passing to the index
   std::vector<oid_t> key_column_ids;
@@ -193,32 +188,27 @@ std::shared_ptr<planner::AbstractPlan> BuildUpdatePlanTree(
   return plan_tree;
 }
 
-TEST_F(UpdateTranslatorTest, UpdatingOld) {
-  LOG_INFO("Bootstrapping...");
+TEST_F(UpdateTranslatorTest, UpdateComplicated) {
+
+  // Bootstrapping
   auto catalog = catalog::Catalog::GetInstance();
   auto &txn_manager = concurrency::TransactionManagerFactory::GetInstance();
   auto txn = txn_manager.BeginTransaction();
   catalog->CreateDatabase(DEFAULT_DB_NAME, txn);
-  LOG_INFO("Bootstrapping completed!");
 
   optimizer::SimpleOptimizer optimizer;
   auto &traffic_cop = tcop::TrafficCop::GetInstance();
 
-  // ======================
-  //  Create a table first
-  // ======================
-
-  LOG_INFO("Creating a table...");
+  //  Create a table
   auto id_column = catalog::Column(type::Type::INTEGER,
                                    type::Type::GetTypeSize(type::Type::INTEGER),
                                    "dept_id", true);
   catalog::Constraint constraint(ConstraintType::PRIMARY, "con_primary");
   id_column.AddConstraint(constraint);
-  auto manager_id_column = catalog::Column(
-      type::Type::INTEGER, type::Type::GetTypeSize(type::Type::INTEGER),
-      "manager_id", true);
-  auto name_column =
-      catalog::Column(type::Type::VARCHAR, 32, "dept_name", false);
+  auto manager_id_column = catalog::Column(type::Type::INTEGER,
+      type::Type::GetTypeSize(type::Type::INTEGER), "manager_id", true);
+  auto name_column = catalog::Column(type::Type::VARCHAR, 32, "dept_name",
+                                     false);
 
   std::unique_ptr<catalog::Schema> table_schema(
       new catalog::Schema({id_column, manager_id_column, name_column}));
@@ -232,158 +222,106 @@ TEST_F(UpdateTranslatorTest, UpdatingOld) {
   txn_manager.CommitTransaction(txn);
   EXPECT_EQ(catalog->GetDatabaseWithName(DEFAULT_DB_NAME)->GetTableCount(), 1);
 
-  LOG_INFO("Table created!");
+  storage::DataTable *table = catalog->GetTableWithName(DEFAULT_DB_NAME,
+                                                        "department_table");
 
-  storage::DataTable *table =
-      catalog->GetTableWithName(DEFAULT_DB_NAME, "department_table");
-
-  // ==============================
   //  Inserting a tuple end-to-end
-  // ==============================
-
   txn = txn_manager.BeginTransaction();
-  LOG_INFO("Inserting a tuple...");
-  LOG_INFO(
-      "Query: INSERT INTO department_table(dept_id,manager_id,dept_name) "
-      "VALUES (1,12,'hello_1');");
+  std::string insert_query = 
+      "INSERT INTO department_table(dept_id,manager_id,dept_name) "
+      "VALUES (1,12,'hello_1');";
   std::unique_ptr<Statement> statement;
-  statement.reset(new Statement("INSERT",
-                                "INSERT INTO "
-                                "department_table(dept_id,manager_id,dept_name)"
-                                " VALUES (1,12,'hello_1');"));
+  statement.reset(new Statement("INSERT", insert_query));
   auto &peloton_parser = parser::PostgresParser::GetInstance();
-  LOG_INFO("Building parse tree...");
-  auto insert_stmt = peloton_parser.BuildParseTree(
-      "INSERT INTO department_table(dept_id,manager_id,dept_name) VALUES "
-      "(1,12,'hello_1');");
-  LOG_INFO("Building parse tree completed!");
-  LOG_INFO("Building plan tree...");
+  auto insert_stmt = peloton_parser.BuildParseTree(insert_query);
   statement->SetPlanTree(optimizer.BuildPelotonPlanTree(insert_stmt));
-  LOG_INFO("Building plan tree completed!");
-  std::vector<type::Value> params;
-  std::vector<StatementResult> result;
   LOG_INFO("Executing plan...\n%s",
            planner::PlanUtil::GetInfo(statement->GetPlanTree().get()).c_str());
 
-  std::vector<int> result_format;
-  result_format =
+  std::vector<type::Value> params;
+  std::vector<StatementResult> result;
+  std::vector<int> result_format =
       std::move(std::vector<int>(statement->GetTupleDescriptor().size(), 0));
   executor::ExecuteResult status = traffic_cop.ExecuteStatementPlan(
       statement->GetPlanTree().get(), params, result, result_format);
   LOG_INFO("Statement executed. Result: %s",
            ResultTypeToString(status.m_result).c_str());
-  LOG_INFO("Tuple inserted!");
-  txn_manager.CommitTransaction(txn);
+  EXPECT_EQ(1, status.m_processed);
 
+  txn_manager.CommitTransaction(txn);
   LOG_INFO("%s", table->GetInfo().c_str());
 
-  // =========================
-  //  Now Updating end-to-end
-  // =========================
-
-  LOG_INFO("Updating a tuple...");
-  LOG_INFO(
-      "Query: UPDATE department_table SET dept_name = 'CS' WHERE dept_id = 1");
-  statement.reset(new Statement(
-      "UPDATE",
-      "UPDATE department_table SET dept_name = 'CS' WHERE dept_id = 1"));
-  LOG_INFO("Building parse tree...");
-  auto update_stmt = peloton_parser.BuildParseTree(
-      "UPDATE department_table SET dept_name = 'CS' WHERE dept_id = 1");
-  LOG_INFO("Building parse tree completed!");
-  LOG_INFO("Building plan tree...");
+  //  Now Update a tuple
+  std::string update_query_1 =
+      "UPDATE department_table SET dept_name = 'CS' WHERE dept_id = 1";
+  statement.reset(new Statement("UPDATE", update_query_1));
+  auto update_stmt = peloton_parser.BuildParseTree(update_query_1);
   statement->SetPlanTree(BuildUpdatePlanTree(update_stmt));
-  LOG_INFO("Building plan tree completed!");
   LOG_INFO("Executing plan...\n%s",
            planner::PlanUtil::GetInfo(statement->GetPlanTree().get()).c_str());
+
   // Now embed the scan and the transformation to build up an update plan.
   auto &update_plan_1 =
       *reinterpret_cast<planner::UpdatePlan *>(statement->GetPlanTree().get());
-  // Do binding
+
   planner::BindingContext ctx_1;
   update_plan_1.PerformBinding(ctx_1);
-  // We collect the results of the query into an in-memory buffer
   codegen::BufferingConsumer buffer_1{{}, ctx_1};
-  // COMPILE and execute
+
   CompileAndExecute(update_plan_1, buffer_1,
                     reinterpret_cast<char *>(buffer_1.GetState()));
-  LOG_INFO("Tuple Updated!");
-
   LOG_INFO("%s", table->GetInfo().c_str());
 
-  LOG_INFO("Updating another tuple...");
-  LOG_INFO(
-      "Query: UPDATE department_table SET manager_id = manager_id + 1 WHERE "
-      "dept_id = 1");
-  statement.reset(new Statement("UPDATE",
-                                "UPDATE department_table SET manager_id = "
-                                "manager_id + 1 WHERE dept_id = 1"));
-  LOG_INFO("Building parse tree...");
-  update_stmt = peloton_parser.BuildParseTree(
-      "UPDATE department_table SET manager_id = manager_id + 1 WHERE dept_id = "
-      "1");
-  LOG_INFO("Building parse tree completed!");
-  LOG_INFO("Building plan tree...");
+  //  Now Update another tuple
+  std::string update_query_2 =
+      "UPDATE department_table SET manager_id = manager_id + 1 WHERE "
+      "dept_id = 1";
+  statement.reset(new Statement("UPDATE", update_query_2));
+  update_stmt = peloton_parser.BuildParseTree(update_query_2);
   statement->SetPlanTree(BuildUpdatePlanTree(update_stmt));
-  LOG_INFO("Building plan tree completed!");
   LOG_INFO("Executing plan...\n%s",
            planner::PlanUtil::GetInfo(statement->GetPlanTree().get()).c_str());
+
   // Now embed the scan and the transformation to build up an update plan.
   auto &update_plan_2 =
       *reinterpret_cast<planner::UpdatePlan *>(statement->GetPlanTree().get());
-  // Do binding
+
   planner::BindingContext ctx_2;
   update_plan_2.PerformBinding(ctx_2);
-  // We collect the results of the query into an in-memory buffer
   codegen::BufferingConsumer buffer_2{{}, ctx_2};
-  // COMPILE and execute
+
   CompileAndExecute(update_plan_2, buffer_2,
                     reinterpret_cast<char *>(buffer_2.GetState()));
-  LOG_INFO("Tuple Updated!");
-
   LOG_INFO("%s", table->GetInfo().c_str());
 
-  LOG_INFO("Updating primary key...");
-  LOG_INFO("Query: UPDATE department_table SET dept_id = 2 WHERE dept_id = 1");
-  statement.reset(new Statement(
-      "UPDATE", "UPDATE department_table SET dept_id = 2 WHERE dept_id = 1"));
-  LOG_INFO("Building parse tree...");
-  update_stmt = peloton_parser.BuildParseTree(
-      "UPDATE department_table SET dept_id = 2 WHERE dept_id = 1");
-  LOG_INFO("Building parse tree completed!");
-  LOG_INFO("Building plan tree...");
+  // Updating a primary key
+  std::string update_query_3 =
+      "UPDATE department_table SET dept_id = 2 WHERE dept_id = 1";
+  statement.reset(new Statement("UPDATE", update_query_3));
+  update_stmt = peloton_parser.BuildParseTree(update_query_3);
   statement->SetPlanTree(BuildUpdatePlanTree(update_stmt));
-  LOG_INFO("Building plan tree completed!");
   LOG_INFO("Executing plan...\n%s",
            planner::PlanUtil::GetInfo(statement->GetPlanTree().get()).c_str());
+
   // Now embed the scan and the transformation to build up an update plan.
   auto &update_plan_3 =
       *reinterpret_cast<planner::UpdatePlan *>(statement->GetPlanTree().get());
-  // Do binding
+
   planner::BindingContext ctx_3;
   update_plan_3.PerformBinding(ctx_3);
-  // We collect the results of the query into an in-memory buffer
   codegen::BufferingConsumer buffer_3{{}, ctx_3};
-  // COMPILE and execute
+
   CompileAndExecute(update_plan_3, buffer_3,
                     reinterpret_cast<char *>(buffer_3.GetState()));
-  LOG_INFO("Tuple Updated!");
-
   LOG_INFO("%s", table->GetInfo().c_str());
 
   // Deleting now
   txn = txn_manager.BeginTransaction();
-  LOG_INFO("Deleting a tuple...");
-  LOG_INFO("Query: DELETE FROM department_table WHERE dept_name = 'CS'");
-  statement.reset(new Statement(
-      "DELETE", "DELETE FROM department_table WHERE dept_name = 'CS'"));
-  LOG_INFO("Building parse tree...");
-  auto delete_stmt = peloton_parser.BuildParseTree(
-      "DELETE FROM department_table WHERE dept_name = 'CS'");
-  LOG_INFO("Building parse tree completed!");
-  LOG_INFO("Building plan tree...");
+  std::string delete_query =
+      "DELETE FROM department_table WHERE dept_name = 'CS';";
+  statement.reset(new Statement("DELETE", delete_query));
+  auto delete_stmt = peloton_parser.BuildParseTree(delete_query);
   statement->SetPlanTree(optimizer.BuildPelotonPlanTree(delete_stmt));
-  LOG_INFO("Building plan tree completed!");
   LOG_INFO("Executing plan...\n%s",
            planner::PlanUtil::GetInfo(statement->GetPlanTree().get()).c_str());
   result_format =
@@ -392,13 +330,14 @@ TEST_F(UpdateTranslatorTest, UpdatingOld) {
                                             params, result, result_format);
   LOG_INFO("Statement executed. Result: %s",
            ResultTypeToString(status.m_result).c_str());
-  LOG_INFO("Tuple deleted!");
   txn_manager.CommitTransaction(txn);
+  LOG_INFO("%s", table->GetInfo().c_str());
+  EXPECT_EQ(1, status.m_processed);
 
-  // free the database just created
   txn = txn_manager.BeginTransaction();
   catalog->DropDatabaseWithName(DEFAULT_DB_NAME, txn);
   txn_manager.CommitTransaction(txn);
 }
+
 }  // namespace test
 }  // namespace peloton

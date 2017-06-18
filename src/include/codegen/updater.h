@@ -24,6 +24,7 @@ class Transaction;
 
 namespace storage {
 class DataTable;
+class TileGroup;
 }  // namespace storage
 
 namespace codegen {
@@ -39,14 +40,14 @@ class Updater {
             uint32_t direct_map_vector_size, bool update_primary_key);
 
   // Update a tuple
-  void Update(uint32_t tile_group_id, uint32_t tuple_offset,
+  void Update(storage::TileGroup *tile_group, uint32_t tuple_offset,
               uint32_t *col_ids, type::Value *target_vals,
               executor::ExecutorContext *executor_context);
  private:
   // No external constructor
   Updater(): txn_(nullptr), table_(nullptr), update_primary_key_(false),
-             target_vector_(nullptr), direct_map_vector_(nullptr),
-             target_vector_size_(0), direct_map_vector_size_(0) {}
+             target_vector_(nullptr), target_vector_size_(0),
+             direct_map_vector_(nullptr),direct_map_vector_size_(0) {}
 
  private:
   // These are provided by the update translator
@@ -54,8 +55,8 @@ class Updater {
   storage::DataTable *table_;
   bool update_primary_key_;
   Target *target_vector_;
-  DirectMap *direct_map_vector_;
   uint32_t target_vector_size_;
+  DirectMap *direct_map_vector_;
   uint32_t direct_map_vector_size_;
 
  private:

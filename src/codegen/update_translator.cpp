@@ -73,7 +73,7 @@ void UpdateTranslator::InitializeState() {
       target_vector_int, TargetProxy::GetType(codegen)->getPointerTo());
 
   auto target_vector_size = project_info->GetTargetList().size();
-  auto *target_vector_size_ptr = codegen.Const64((int64_t)target_vector_size);
+  auto *target_vector_size_ptr = codegen.Const32((int32_t)target_vector_size);
 
   auto *direct_map_vector = project_info->GetDirectMapList().data();
   auto *direct_map_vector_int = codegen.Const64((int64_t)direct_map_vector);
@@ -82,7 +82,7 @@ void UpdateTranslator::InitializeState() {
 
   auto direct_map_vector_size = project_info->GetDirectMapList().size();
   llvm::Value *direct_map_vector_size_ptr =
-      codegen.Const64((int64_t)direct_map_vector_size);
+      codegen.Const32((int32_t)direct_map_vector_size);
 
   llvm::Value *update_primary_key_ptr = codegen.ConstBool(
       update_plan_.GetUpdatePrimaryKey());
@@ -103,6 +103,15 @@ void UpdateTranslator::Produce() const {
 void UpdateTranslator::Consume(ConsumerContext &, RowBatch::Row &row) const {
   auto &codegen = GetCodeGen();
   auto &context = GetCompilationContext();
+
+  storage::DataTable *table = update_plan_.GetTable();
+  llvm::Value *table_ptr = codegen.CallFunc(
+      CatalogProxy::_GetTableWithOid::GetFunction(codegen),
+      {GetCatalogPtr(), codegen.Const32(table->GetDatabaseOid()),
+       codegen.Const32(table->GetOid())});
+  Table table2(*table);
+  llvm::Value *tile_group_ptr =
+      table2.GetTileGroup(codegen, table_ptr, row.GetTileGroupID());
 
   // vector for collecting col ids that are targeted to update
   const auto *project_info = update_plan_.GetProjectInfo();
@@ -133,13 +142,9 @@ void UpdateTranslator::Consume(ConsumerContext &, RowBatch::Row &row) const {
   // Update
   llvm::Value *updater = LoadStatePtr(updater_state_id_);
   auto *update_func = UpdaterProxy::_Update::GetFunction(codegen);
-  codegen.CallFunc(update_func, {updater, row.GetTileGroupID(), 
-                                 row.GetTID(codegen), column_ids_ptr,
-                                 target_vals, executor_context});
-  // Increase the counter
-  auto *processed_func =
-      TransactionRuntimeProxy::_IncreaseNumProcessed::GetFunction(codegen);
-  codegen.CallFunc(processed_func, {executor_context});
+  codegen.CallFunc(update_func, {updater, tile_group_ptr, row.GetTID(codegen),
+                                 column_ids_ptr, target_vals,
+                                 executor_context});
 }
 
 void UpdateTranslator::SetTargetValue(llvm::Value *target_val_vec,
