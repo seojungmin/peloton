@@ -107,10 +107,10 @@ llvm::Function *TransactionRuntimeProxy::_PerformUpdate::GetFunction(
       codegen.Int64Type()->getPointerTo(),                // col_ids
       ValueProxy::GetType(codegen)->getPointerTo(),       // target_vals
       codegen.BoolType(),                                 // update_primary_key
-      TargetProxy::GetType(codegen)->getPointerTo(),      // target_list *
-      codegen.Int64Type(),                                // target_list_size
-      DirectMapProxy::GetType(codegen)->getPointerTo(),   // direct_list *
-      codegen.Int64Type(),                                // direct_list_size
+      TargetProxy::GetType(codegen)->getPointerTo(),      // target_vector *
+      codegen.Int64Type(),                                // target_vector_size
+      DirectMapProxy::GetType(codegen)->getPointerTo(),   // direct_vector *
+      codegen.Int64Type(),                                // direct_vector_size
       ExecutorContextProxy::GetType(codegen)->getPointerTo() // exec_context *
   };
   auto *fn_type = llvm::FunctionType::get(codegen.BoolType(), arg_types,

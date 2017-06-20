@@ -141,21 +141,5 @@ bool Query::Prepare(const QueryFunctions &query_funcs) {
   return true;
 }
 
-void Query::StoreTargetList(TargetList &target_list) {
-  update_target_list_.clear();
-
-  for (uint32_t i = 0; i < target_list.size(); i ++) {
-    update_target_list_.emplace_back(target_list[i]);
-  }
-} 
-  
-void Query::StoreDirectList(DirectMapList &direct_map_list) {
-  update_direct_map_list_.clear();
-
-  for (uint32_t i = 0; i < direct_map_list.size(); i ++) {
-    update_direct_map_list_.emplace_back(direct_map_list[i]);
-  }
-}
-
 }  // namespace codegen
 }  // namespace peloton

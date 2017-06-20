@@ -109,9 +109,9 @@ void UpdateTranslator::Consume(ConsumerContext &, RowBatch::Row &row) const {
       CatalogProxy::_GetTableWithOid::GetFunction(codegen),
       {GetCatalogPtr(), codegen.Const32(table->GetDatabaseOid()),
        codegen.Const32(table->GetOid())});
-  Table table2(*table);
+  Table codegen_table(*table);
   llvm::Value *tile_group_ptr =
-      table2.GetTileGroup(codegen, table_ptr, row.GetTileGroupID());
+      codegen_table.GetTileGroup(codegen, table_ptr, row.GetTileGroupID());
 
   // vector for collecting col ids that are targeted to update
   const auto *project_info = update_plan_.GetProjectInfo();
@@ -201,7 +201,6 @@ void UpdateTranslator::SetTargetValue(llvm::Value *target_val_vec,
     }
   }
 }
-
 
 }  // namespace codegen
 }  // namespace peloton
