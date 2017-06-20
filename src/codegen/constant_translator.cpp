@@ -66,7 +66,8 @@ codegen::Value ConstantTranslator::DeriveValue(CodeGen &codegen,
       std::string str = type::ValuePeeker::PeekVarchar(constant);
       // val should be a pointer type to be used in comparisions inside a PHI
       val = codegen.ConstStringPtr(str);
-      len = codegen.Const32(str.length());
+      // VARCHAR Type Constant is considered to have the null terminator
+      len = codegen.Const32(str.length()+1);
       break;
     }
     default: {

@@ -31,6 +31,12 @@ class TransactionRuntimeProxy {
     static llvm::Function *GetFunction(CodeGen &codegen);
   };
 
+  // The proxy around TransactionRuntime::PerformUpdate()
+  struct _PerformUpdate {
+    static const std::string &GetFunctionName();
+    static llvm::Function *GetFunction(CodeGen &codegen);
+  };
+
   // The proxy around TransactionRuntime::IncreaseNumProcessed()
   struct _IncreaseNumProcessed {
     static const std::string &GetFunctionName();
