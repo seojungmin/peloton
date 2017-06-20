@@ -4,7 +4,7 @@
 //
 // update_translator.h
 //
-// Identification: src/include/codegen/update/update_translator.h
+// Identification: src/include/codegen/update_translator.h
 //
 // Copyright (c) 2015-17, Carnegie Mellon University Database Group
 //

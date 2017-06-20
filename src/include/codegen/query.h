@@ -15,8 +15,6 @@
 #include "codegen/code_context.h"
 #include "codegen/runtime_state.h"
 #include "executor/executor_context.h"
-#include "executor/executor_context.h"
-#include "type/types.h"
 
 namespace peloton {
 

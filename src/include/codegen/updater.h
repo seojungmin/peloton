@@ -33,7 +33,7 @@ namespace codegen {
 // through its Init() outside the main loop
 class Updater {
  public:
-  // Initializes the instance
+  // Initialize the instance
   void Init(concurrency::Transaction *txn, storage::DataTable *table,
             Target *target_vector, uint32_t target_vector_size,
             DirectMap *direct_map_vector,
