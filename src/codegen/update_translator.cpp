@@ -42,13 +42,14 @@ UpdateTranslator::UpdateTranslator(const planner::UpdatePlan &update_plan,
   // Prepare for registering RuntimeState
   auto &codegen = GetCodeGen();
   auto &runtime_state = context.GetRuntimeState();
-  auto column_num = target_list.size();
-
+#if 0
   // Vectors are 
+  auto column_num = target_list.size();
   target_val_vec_id_ = runtime_state.RegisterState( "updateTargetValVec",
       codegen.VectorType(ValueProxy::GetType(codegen), column_num), true);
   column_id_vec_id_ = runtime_state.RegisterState( "updateColumnIdVec",
       codegen.VectorType(codegen.Int64Type(), column_num), true);
+#endif
 
   updater_state_id_ = runtime_state.RegisterState("updater",
       UpdaterProxy::GetType(codegen));
@@ -66,6 +67,7 @@ void UpdateTranslator::InitializeState() {
       {GetCatalogPtr(), codegen.Const32(table->GetDatabaseOid()),
        codegen.Const32(table->GetOid())});
 
+#if 0
   const auto *project_info = update_plan_.GetProjectInfo();
   auto *target_vector = project_info->GetTargetList().data();
   auto *target_vector_int = codegen.Const64((int64_t)target_vector);
@@ -83,6 +85,7 @@ void UpdateTranslator::InitializeState() {
   auto direct_map_vector_size = project_info->GetDirectMapList().size();
   llvm::Value *direct_map_vector_size_ptr =
       codegen.Const32((int32_t)direct_map_vector_size);
+#endif
 
   llvm::Value *update_primary_key_ptr = codegen.ConstBool(
       update_plan_.GetUpdatePrimaryKey());
@@ -110,8 +113,8 @@ void UpdateTranslator::Consume(ConsumerContext &, RowBatch::Row &row) const {
       {GetCatalogPtr(), codegen.Const32(table->GetDatabaseOid()),
        codegen.Const32(table->GetOid())});
   Table codegen_table(*table);
-  llvm::Value *tile_group_ptr =
-      codegen_table.GetTileGroup(codegen, table_ptr, row.GetTileGroupID());
+  llvm::Value *tile_group_ptr = codegen_table.GetTileGroup(codegen, table_ptr,
+      row.GetTileGroupID());
 
   // Vector for collecting col ids that are targeted to update
   const auto *project_info = update_plan_.GetProjectInfo();
@@ -137,6 +140,10 @@ void UpdateTranslator::Consume(ConsumerContext &, RowBatch::Row &row) const {
   }
 
   auto column_ids_ptr = column_ids.GetVectorPtr();
+  auto *update_func = UpdaterProxy::_Materialize::GetFunction(codegen);
+  codegen.CallFunc(update_func, {updater, tile_group_ptr, row.GetTID(codegen),
+                                 column_ids_ptr, target_vals,
+                                 executor_context});
   auto *executor_context = context.GetExecutorContextPtr();
 
   // Finally, update!
