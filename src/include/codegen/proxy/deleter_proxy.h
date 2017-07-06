@@ -14,6 +14,7 @@
 
 #include "codegen/codegen.h"
 #include "codegen/proxy/data_table_proxy.h"
+#include "codegen/proxy/executor_context_proxy.h"
 #include "codegen/proxy/transaction_proxy.h"
 
 namespace peloton {
@@ -44,10 +45,10 @@ struct DeleterProxy {
       static const std::string init_fn_name =
 #ifdef __APPLE__
           "_ZN7peloton7codegen7Deleter4InitEPNS_11concurrency11TransactionEPNS_"
-          "7storage9DataTableE";
+          "7storage9DataTableEPNS_8executor15ExecutorContextE";
 #else
           "_ZN7peloton7codegen7Deleter4InitEPNS_11concurrency11TransactionEPNS_"
-          "7storage9DataTableE";
+          "7storage9DataTableEPNS_8executor15ExecutorContextE";
 #endif
       return init_fn_name;
     }
@@ -64,7 +65,8 @@ struct DeleterProxy {
       std::vector<llvm::Type *> fn_args = {
           DeleterProxy::GetType(codegen)->getPointerTo(),
           TransactionProxy::GetType(codegen)->getPointerTo(),
-          DataTableProxy::GetType(codegen)->getPointerTo()};
+          DataTableProxy::GetType(codegen)->getPointerTo(),
+          ExecutorContextProxy::GetType(codegen)->getPointerTo()};
       llvm::FunctionType *fn_type =
           llvm::FunctionType::get(codegen.VoidType(), fn_args, false);
       return codegen.RegisterFunction(fn_name, fn_type);
