@@ -62,13 +62,13 @@ llvm::Function* TileGroupProxy::_GetNextTupleSlot::GetFunction(
 }
 
 const std::string& TileGroupProxy::_GetTileGroupId::GetFunctionName() {
-  static const std::string kGetNextTupleSlot =
+  static const std::string kGetTileGroupIdFnName =
 #ifdef __APPLE__
       "_ZNK7peloton7storage9TileGroup14GetTileGroupIdEv";
 #else
       "_ZNK7peloton7storage9TileGroup14GetTileGroupIdEv";
 #endif
-  return kGetNextTupleSlot;
+  return kGetTileGroupIdFnName;
 }
 
 llvm::Function* TileGroupProxy::_GetTileGroupId::GetFunction(CodeGen& codegen) {
