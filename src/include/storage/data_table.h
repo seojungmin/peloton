@@ -122,7 +122,7 @@ class DataTable : public AbstractTable {
   ItemPointer InsertTuple(const Tuple *tuple);
 
   // Insert tuple with ItemPointer provided explicitly
-  bool InsertTuple(const storage::Tuple *tuple, ItemPointer location,
+  bool InsertTuple(const AbstractTuple *tuple, ItemPointer location,
       concurrency::Transaction *transaction, ItemPointer **index_entry_ptr);
 
   //===--------------------------------------------------------------------===//
@@ -252,7 +252,7 @@ class DataTable : public AbstractTable {
   // try to insert into all indexes.
   // the last argument is the index entry in primary index holding the new
   // tuple.
-  bool InsertInIndexes(const storage::Tuple *tuple, ItemPointer location,
+  bool InsertInIndexes(const AbstractTuple *tuple, ItemPointer location,
                        concurrency::Transaction *transaction,
                        ItemPointer **index_entry_ptr);
 
@@ -298,7 +298,7 @@ class DataTable : public AbstractTable {
                                 ItemPointer *index_entry_ptr);
 
   // check the foreign key constraints
-  bool CheckForeignKeyConstraints(const storage::Tuple *tuple);
+  bool CheckForeignKeyConstraints(const AbstractTuple *tuple);
 
  public:
   static size_t default_active_tilegroup_count_;
