@@ -6,7 +6,7 @@
 //
 // Identification: src/include/planner/insert_plan.h
 //
-// Copyright (c) 2015-16, Carnegie Mellon University Database Group
+// Copyright (c) 2015-17, Carnegie Mellon University Database Group
 //
 //===----------------------------------------------------------------------===//
 
@@ -22,42 +22,29 @@ class DataTable;
 class Tuple;
 }
 
-namespace parser {
-class InsertStatement;
-}
-
 namespace planner {
 class InsertPlan : public AbstractPlan {
  public:
-  // This constructor takes in neither a project info nor a tuple
-  // It must be used when the input is a logical tile
-  explicit InsertPlan(storage::DataTable *table, oid_t bulk_insert_count = 1);
+  // Constructor for INSERT INTO SELECT - used by the optimizer
+  InsertPlan(storage::DataTable *table, oid_t bulk_insert_count = 1);
 
-  // This constructor takes in a project info
-  explicit InsertPlan(
-      storage::DataTable *table,
-      std::unique_ptr<const planner::ProjectInfo> &&project_info,
-      oid_t bulk_insert_count = 1);
-  // This constructor takes in a tuple
-  explicit InsertPlan(storage::DataTable *table,
-                      std::unique_ptr<storage::Tuple> &&tuple,
-                      oid_t bulk_insert_count = 1);
-  // This constructor takes in a table name and a tuple
-  explicit InsertPlan(std::string table_name,
-                      std::unique_ptr<storage::Tuple> &&tuple,
-                      oid_t bulk_insert_count = 1);
+  // Constuctor for a direct tuple insertion
+  InsertPlan(storage::DataTable *table, std::unique_ptr<storage::Tuple> &&tuple,
+             oid_t bulk_insert_count = 1);
 
-  explicit InsertPlan(
-      storage::DataTable *table, std::vector<char *> *columns,
+  // Constructor for a ProjectInfo specification
+  InsertPlan(storage::DataTable *table,
+             std::unique_ptr<const planner::ProjectInfo> &&project_info,
+             oid_t bulk_insert_count = 1);
+
+  // Constructor for INSERT with column values - used by the optimizer
+  InsertPlan(storage::DataTable *table, std::vector<char *> *columns,
       std::vector<std::vector<peloton::expression::AbstractExpression *> *> *
           insert_values);
 
-  // Get a varlen pool (will construct the pool only if needed)
-  type::AbstractPool *GetPlanPool();
-
   inline PlanNodeType GetPlanNodeType() const { return PlanNodeType::INSERT; }
 
-  void SetParameterValues(std::vector<type::Value> *values);
+  const std::string GetInfo() const { return "InsertPlan"; }
 
   storage::DataTable *GetTable() const { return target_table_; }
 
@@ -67,6 +54,8 @@ class InsertPlan : public AbstractPlan {
 
   oid_t GetBulkInsertCount() const { return bulk_insert_count; }
 
+  type::AbstractPool *GetPlanPool();
+
   const storage::Tuple *GetTuple(int tuple_idx) const {
     if (tuple_idx >= (int)tuples_.size()) {
       return nullptr;
@@ -74,7 +63,7 @@ class InsertPlan : public AbstractPlan {
     return tuples_[tuple_idx].get();
   }
 
-  const std::string GetInfo() const { return "InsertPlan"; }
+  void SetParameterValues(std::vector<type::Value> *values);
 
   std::unique_ptr<AbstractPlan> Copy() const {
     // TODO: Add copying mechanism
@@ -83,13 +72,10 @@ class InsertPlan : public AbstractPlan {
   }
 
  private:
-  /** @brief Target table. */
   storage::DataTable *target_table_ = nullptr;
 
-  /** @brief Projection Info */
   std::unique_ptr<const planner::ProjectInfo> project_info_;
 
-  /** @brief Tuple */
   std::vector<std::unique_ptr<storage::Tuple>> tuples_;
 
   // <tuple_index, tuple_column_index, parameter_index>
@@ -99,10 +85,10 @@ class InsertPlan : public AbstractPlan {
   // Parameter values
   std::unique_ptr<std::vector<type::TypeId>> params_value_type_;
 
-  /** @brief Number of times to insert */
+  // Number of times to insert
   oid_t bulk_insert_count;
 
-  // pool for variable length types
+  // Pool for variable length types
   std::unique_ptr<type::AbstractPool> pool_;
 
  private:
