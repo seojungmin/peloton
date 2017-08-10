@@ -38,7 +38,7 @@ namespace test {
 //===----------------------------------------------------------------------===//
 class PelotonCodeGenTest : public PelotonTest {
  public:
-  enum class TableId : uint32_t { _1 = 44, _2 = 45, _3 = 46, _4 = 47 };
+  enum class TableId : uint32_t { _1 = 44, _2 = 45, _3 = 46, _4 = 47, _5 = 48 };
 
   const uint32_t test_db_id = INVALID_OID;
 
@@ -55,7 +55,8 @@ class PelotonCodeGenTest : public PelotonTest {
   }
 
   // Create the schema (common among all tables)
-  std::unique_ptr<catalog::Schema> CreateTestSchema() const;
+  std::unique_ptr<catalog::Schema> CreateTestSchema(bool add_primary = false)
+      const;
 
   // Create the test tables
   void CreateTestTables();

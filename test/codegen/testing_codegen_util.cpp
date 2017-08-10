@@ -47,7 +47,8 @@ PelotonCodeGenTest::~PelotonCodeGenTest() {
 }
 
 // Create the test schema for all the tables
-std::unique_ptr<catalog::Schema> PelotonCodeGenTest::CreateTestSchema() const {
+std::unique_ptr<catalog::Schema> PelotonCodeGenTest::CreateTestSchema(
+    bool add_primary) const {
   bool is_inlined = true;
 
   // Create the columns
@@ -62,6 +63,9 @@ std::unique_ptr<catalog::Schema> PelotonCodeGenTest::CreateTestSchema() const {
   // Add NOT NULL constraints on COL_A, COL_C, COL_D
   cols[0].AddConstraint(
       catalog::Constraint{ConstraintType::NOTNULL, "not_null"});
+  if (add_primary == true)
+    cols[0].AddConstraint(
+        catalog::Constraint{ConstraintType::PRIMARY, "con_primary"});
   cols[2].AddConstraint(
       catalog::Constraint{ConstraintType::NOTNULL, "not_null"});
   cols[3].AddConstraint(
@@ -101,11 +105,17 @@ void PelotonCodeGenTest::CreateTestTables() {
       GetDatabase().GetOid(), (uint32_t)TableId::_4, table4_schema.release(),
       "table4", tuples_per_tilegroup, own_schema, adapt_table);
 
+  auto table5_schema = CreateTestSchema(true);
+  auto *table5 = storage::TableFactory::GetDataTable(
+      GetDatabase().GetOid(), (uint32_t)TableId::_5, table5_schema.release(),
+      "table5", tuples_per_tilegroup, own_schema, adapt_table);
+
   // Insert all tables into the test database
   GetDatabase().AddTable(table1, false);
   GetDatabase().AddTable(table2, false);
   GetDatabase().AddTable(table3, false);
   GetDatabase().AddTable(table4, false);
+  GetDatabase().AddTable(table5, false);
 }
 
 void PelotonCodeGenTest::LoadTestTable(TableId table_id, uint32_t num_rows,
