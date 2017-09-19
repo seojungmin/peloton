@@ -26,13 +26,15 @@
 #include "codegen/operator/projection_translator.h"
 #include "codegen/operator/table_scan_translator.h"
 #include "codegen/expression/tuple_value_translator.h"
+#include "codegen/expression/parameter_translator.h"
+#include "expression/aggregate_expression.h"
 #include "expression/case_expression.h"
 #include "expression/comparison_expression.h"
 #include "expression/conjunction_expression.h"
 #include "expression/constant_value_expression.h"
 #include "expression/operator_expression.h"
+#include "expression/parameter_value_expression.h"
 #include "expression/tuple_value_expression.h"
-#include "expression/aggregate_expression.h"
 #include "planner/aggregate_plan.h"
 #include "planner/delete_plan.h"
 #include "planner/hash_join_plan.h"
@@ -110,6 +112,12 @@ std::unique_ptr<ExpressionTranslator> TranslatorFactory::CreateTranslator(
     CompilationContext &context) const {
   ExpressionTranslator *translator = nullptr;
   switch (exp.GetExpressionType()) {
+    case ExpressionType::VALUE_PARAMETER: {
+      auto &param_exp =
+          static_cast<const expression::ParameterValueExpression &>(exp);
+      translator = new ParameterTranslator(param_exp, context);
+      break;
+    }
     case ExpressionType::VALUE_CONSTANT: {
       auto &const_exp =
           static_cast<const expression::ConstantValueExpression &>(exp);
