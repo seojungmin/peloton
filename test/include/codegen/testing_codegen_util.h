@@ -73,7 +73,7 @@ class PelotonCodeGenTest : public PelotonTest {
   codegen::QueryCompiler::CompileStats CompileAndExecuteCache(
       const std::shared_ptr<planner::AbstractPlan> &plan,
       codegen::QueryResultConsumer &consumer, char *consumer_state,
-      std::vector<type::Value> *params = nullptr);
+      std::vector<type::Value> *params = nullptr, bool *cached = nullptr);
 
   //===--------------------------------------------------------------------===//
   // Helpers
@@ -81,6 +81,9 @@ class PelotonCodeGenTest : public PelotonTest {
   std::unique_ptr<expression::AbstractExpression> ConstIntExpr(int64_t val);
 
   std::unique_ptr<expression::AbstractExpression> ConstDecimalExpr(double val);
+
+  std::unique_ptr<expression::AbstractExpression> ConstVarcharExpr(
+      std::string str);
 
   std::unique_ptr<expression::AbstractExpression> ColRefExpr(type::TypeId type,
                                                              uint32_t col_id);

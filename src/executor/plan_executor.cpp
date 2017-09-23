@@ -107,7 +107,7 @@ ExecuteResult PlanExecutor::ExecutePlan(
   plan->GetOutputColumns(columns);
   codegen::BufferingConsumer consumer{columns, context};
 
-  // Compile & execute the query
+  // Compile and execute the query
   codegen::QueryCompiler compiler;
   codegen::QueryParameters parameters{*plan, params};
 
@@ -115,12 +115,11 @@ ExecuteResult PlanExecutor::ExecutePlan(
   if (query == nullptr) {
     auto compiled_query = compiler.Compile(*plan, parameters, consumer);
 
-    // Set up the query parameters
     compiled_query->Execute(*txn, executor_context.get(), &parameters,
                             reinterpret_cast<char *>(consumer.GetState()));
     codegen::QueryCache::Instance().Add(plan, std::move(compiled_query));
   } else {
-    query->Execute(*txn, executor_context.get(),
+    query->Execute(*txn, executor_context.get(), &parameters,
                    reinterpret_cast<char *>(consumer.GetState()));
   }
 
