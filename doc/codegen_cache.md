@@ -10,25 +10,23 @@ The query cache feature is based on plan/expression comparisons, including schem
 
 In a brief summary, it contains modifications on the following modules:
 
-[Comparisons]
-  - catalog: Hash/equality checks on `Schema`
-  - storage: Hash/equality checks on `DataTable`
-  - expression: Hash/equality checks on expressions such as `AbstractExpression`, `CaseExpression`, `ConstantValueExpression`, `ParameterValueExpression` and `TupleValueExpression`
-  - planner: Hash/equality checks and parameter retrieval on plans such as `AggregatePlan`, `DeletePlan`, `HashJoinPlan`, `HashPlan`, `InsertPlan`, `OrderByPlan`, `ProjectInfo`, `ProjectionPlan`, `SeqScanPlan` and `UpdatePlan`
+### Plan Comparisons ###
+* catalog: Hash/equality checks on `Schema`
+* storage: Hash/equality checks on `DataTable`
+* expression: Hash/equality checks on expressions such as `AbstractExpression`, `CaseExpression`, `ConstantValueExpression`, `ParameterValueExpression` and `TupleValueExpression`
+* planner: Hash/equality checks and parameter retrieval on plans such as `AggregatePlan`, `DeletePlan`, `HashJoinPlan`, `HashPlan`, `InsertPlan`, `OrderByPlan`, `ProjectInfo`, `ProjectionPlan`, `SeqScanPlan` and `UpdatePlan`
 
-[Parameter Retrieval]
-  - codegen: Parameter value/information retrieval 
+### Parameter Retrieval ###
+* codegen: Parameter value/information retrieval 
 
-[Query Cache/Execution]
-  - execution: Query cache checks before executing a query
-  - codegen: Query cache, parameter value cache, translator additions and changes including operators/expressions
+### Query Cache and Execution ###
+* execution: Query cache checks before executing a query
+* codegen: Query cache, parameter value cache, translator additions and changes including operators/expressions
 
 ## Glossary
-
-  - Query cache: cache of the query objects with compiled object for codegen execution, which is different from physical plan cache or cache
+* Query cache: cache of the query objects with compiled object for codegen execution, which is different from physical plan cache or cache
 
 ## Architectural Design
-
 The entire flow of a query execution stays the same as before, but only bypass the compilation stage only when there has been a similar query executed.  A similar query here is defined as a query with different constant values or different parameter values. This, in a high level, is done in `executor::PlanExecutor` before a query execution. 
 
 `QueryCache` keeps all the compiled queries in a hash table and this is global in Peloton. A search for an equal query is executed by `Hash()` and `operation==` that are provided by the plan that is going to be compared. Once the comparison succeds, `PlanExecutor` obtains the previously compiled query, a `Query` object, from the cache and the query object is executed through its `Execute()` function.  The `Query` contains a set of compiled functions that can be executed inside LLVM.
